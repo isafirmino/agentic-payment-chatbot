@@ -48,7 +48,9 @@ pular). A ordem é:
    `/grill-me` (`.github/prompts/grill-me.prompt.md`).
 3. **`to-spec`** — sintetiza a conversa já grillada em
    `specs/<NNN>-<slug>/{spec.md,plan.md,tasks.md}` (copie
-   `specs/TEMPLATE/`). Claude: skill `to-spec`. Copilot: `/to-spec`.
+   `specs/TEMPLATE/`) se for feature nova, ou em uma emenda à spec
+   existente se o `grill-me` identificou que não é ("## Emenda" em
+   `spec.md`, sem pasta nova). Claude: skill `to-spec`. Copilot: `/to-spec`.
 4. Implementar seguindo `tasks.md`, numa branch `feat/<NNN>/<resumo-em-ingles>`
    (`NNN` é o número da task no GitHub Projects do repo, não o número do
    spec — os dois são numerados à parte) criada a partir de `develop`,

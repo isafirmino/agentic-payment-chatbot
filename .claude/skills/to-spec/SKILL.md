@@ -12,7 +12,23 @@ aberto, pare e sugira rodar `grill-me` primeiro.
 Não existe issue tracker externo neste projeto: o spec vive no próprio
 repositório, em `specs/`.
 
-## Processo
+## Feature nova ou emenda?
+
+Antes de tudo, decida isso — muda o resto do processo:
+
+- **Feature nova**: o comportamento discutido não tem spec cobrindo ele
+  ainda. Segue o processo normal (abaixo): cria `specs/<NNN>-<slug>/` novo.
+- **Emenda**: a conversa altera, corrige ou estende comportamento que um
+  `spec.md` já existente descreve (a `grilling` já deve ter sinalizado isso
+  e apontado o candidato). Confirme com o usuário qual `specs/<NNN>-<slug>/`
+  é, se ainda não estiver claro, e siga o processo de emenda: **## Emenda a
+  spec existente**, abaixo — não crie pasta nova.
+
+Na dúvida (a mudança é grande o suficiente que parece feature própria,
+mesmo tocando em algo já especificado): pergunte ao usuário, não decida
+sozinho.
+
+## Processo (feature nova)
 
 1. Explore o repo o quanto for preciso pra entender o estado atual das
    pastas envolvidas (`chat-web/`, `api-auth/`, `mcp-server/`, conforme a
@@ -26,6 +42,24 @@ repositório, em `specs/`.
    preencha os três arquivos abaixo.
 4. Confirme com o usuário que os três arquivos refletem o que foi discutido
    antes de considerar a feature pronta pra implementação.
+
+## Emenda a spec existente
+
+Não crie pasta nova nem renumere nada — a spec existente continua sendo a
+mesma feature, só ganha uma revisão. No `specs/<NNN>-<slug>/` já
+identificado:
+
+1. Em `spec.md`, acrescente uma seção `## Emenda — <YYYY-MM-DD>` no final
+   do arquivo com: o que muda (nova user story, story revisada, novo caso
+   de erro, mudança de decisão de implementação/teste) e o porquê. Não
+   reescreva silenciosamente o que já existia — se uma decisão anterior foi
+   revertida, deixe isso explícito na emenda em vez de apagar o rastro.
+2. Atualize `plan.md` se a abordagem técnica muda (esse arquivo não tem
+   histórico — reflete só o estado atual do plano).
+3. Acrescente os novos itens em `tasks.md` (`- [ ] ...`) sem mexer nos itens
+   já marcados como feitos.
+4. Confirme com o usuário que a emenda reflete o que foi discutido antes de
+   considerar pronta pra implementação.
 
 <spec-template nome-do-arquivo="spec.md">
 

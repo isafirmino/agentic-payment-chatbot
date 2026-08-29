@@ -4,9 +4,18 @@ description: Sintetiza a conversa atual (já grillada) em specs/<NNN>-<slug>/{sp
 ---
 
 Sintetize o entendimento já alcançado nesta conversa (idealmente depois de
-rodar `/grill-me`) em três arquivos dentro de `specs/`. Não faça perguntas
-novas de design aqui — se algo ainda está em aberto, pare e sugira rodar
-`/grill-me` primeiro.
+rodar `/grill-me`) em `specs/`. Não faça perguntas novas de design aqui —
+se algo ainda está em aberto, pare e sugira rodar `/grill-me` primeiro.
+
+## Feature nova ou emenda?
+
+Decida isso primeiro — olhe `specs/` (fora `specs/TEMPLATE/`): se a
+conversa altera, corrige ou estende comportamento que um `spec.md`
+existente já descreve, isso é **emenda**, não feature nova — vá direto pra
+"Processo (emenda)" abaixo, sem criar pasta nova. Na dúvida, pergunte ao
+usuário antes de decidir.
+
+## Processo (feature nova)
 
 1. Olhe `specs/` e escolha o próximo número (`NNN` = maior existente + 1,
    ou `001` se não houver nenhum), e um `slug` curto em kebab-case.
@@ -25,3 +34,19 @@ novas de design aqui — se algo ainda está em aberto, pare e sugira rodar
    existente.
 7. Confirme com o usuário que os três arquivos batem com o que foi discutido
    antes de considerar pronto pra implementar.
+
+## Processo (emenda)
+
+Não crie pasta nova nem renumere nada — a spec existente continua sendo a
+mesma feature, só ganha uma revisão. No `specs/<NNN>-<slug>/` identificado:
+
+1. Em `spec.md`, acrescente `## Emenda — <YYYY-MM-DD>` no final com o que
+   muda e o porquê. Não reescreva o que já existia — se uma decisão
+   anterior foi revertida, deixe isso explícito na emenda em vez de apagar
+   o rastro.
+2. Atualize `plan.md` se a abordagem técnica muda (sem histórico — reflete
+   só o estado atual).
+3. Acrescente os novos itens em `tasks.md` sem mexer nos já marcados como
+   feitos.
+4. Confirme com o usuário que a emenda bate com o que foi discutido antes
+   de considerar pronta pra implementar.

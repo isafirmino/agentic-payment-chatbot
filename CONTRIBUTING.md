@@ -57,8 +57,9 @@ Antes de escrever código de uma feature (não de um fix pontual), o fluxo é:
    assumido silenciosamente (decisões de design, casos de borda, integração
    com o que já existe).
 3. **`to-spec`** — sintetiza a conversa já "grillada" em
-   `specs/<NNN>-<slug>/spec.md` + `plan.md` + `tasks.md`. Copie
-   `specs/TEMPLATE/` para começar.
+   `specs/<NNN>-<slug>/spec.md` + `plan.md` + `tasks.md` (copie
+   `specs/TEMPLATE/`), ou numa emenda à spec existente se a mudança não for
+   feature nova (o `grill-me` sinaliza isso durante a entrevista).
 4. **Implemente** seguindo o `tasks.md`, marcando os itens conforme completa.
 5. **`pr-review`** — antes de abrir o PR, roda a revisão em três frentes:
    conformidade com este documento e com as convenções de código do projeto;

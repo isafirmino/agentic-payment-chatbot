@@ -47,6 +47,15 @@ A sessão termina quando a fronteira está vazia: todo ramo da árvore de
 design foi visitado, nada ficou assumido silenciosamente. Não aja em cima
 disso até o usuário confirmar que chegamos a um entendimento compartilhado.
 
+Antes do primeiro round, dê uma olhada em `specs/` (fora `specs/TEMPLATE/`):
+se o que está sendo discutido altera ou estende comportamento que uma spec
+existente já descreve — não uma feature nova, mas ajuste/extensão de algo
+já especificado —, diga isso ao usuário assim que perceber e cite qual
+`specs/<NNN>-<slug>/` parece ser. Isso muda o que sai no final: uma emenda
+à spec existente, não uma spec nova (critério e mecânica ficam no
+`to-spec`). Continue a entrevista normalmente — isso só muda o destino do
+resultado, não a forma de perguntar.
+
 Quando a sessão terminar, sugira rodar o skill `to-spec` pra transformar o
-que foi decidido em `spec.md`/`plan.md`/`tasks.md` — não escreva esses
-arquivos você mesmo aqui, esse é o trabalho do outro skill.
+que foi decidido em spec nova ou emenda a uma spec existente — não escreva
+esses arquivos você mesmo aqui, esse é o trabalho do outro skill.
