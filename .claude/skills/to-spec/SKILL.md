@@ -1,7 +1,6 @@
 ---
 name: to-spec
-description: "Transforma a conversa atual (já grillada) em spec + plan + tasks salvos em specs/: sem entrevista nova, só síntese do que já foi discutido."
-disable-model-invocation: true
+description: "Transforma a conversa atual (já grillada) em spec + plan + tasks salvos em specs/: sem entrevista nova, só síntese do que já foi discutido. Invoque automaticamente assim que uma sessão de grilling/grill-me terminar (fronteira vazia) e o usuário confirmar que chegaram a um entendimento compartilhado — não é preciso esperar o usuário digitar /to-spec."
 ---
 
 Este skill pega o entendimento já alcançado na conversa (idealmente depois

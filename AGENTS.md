@@ -50,7 +50,10 @@ pular). A ordem é:
    `specs/<NNN>-<slug>/{spec.md,plan.md,tasks.md}` (copie
    `specs/TEMPLATE/`) se for feature nova, ou em uma emenda à spec
    existente se o `grill-me` identificou que não é ("## Emenda" em
-   `spec.md`, sem pasta nova). Claude: skill `to-spec`. Copilot: `/to-spec`.
+   `spec.md`, sem pasta nova). Claude chama isso automaticamente assim que
+   o `grilling` termina (fronteira vazia) e o usuário confirma entendimento
+   compartilhado — não precisa esperar o usuário digitar `/to-spec`.
+   Copilot: usuário digita `/to-spec` (sem invocação automática).
 4. Implementar seguindo `tasks.md`, numa branch `feat/<NNN>/<resumo-em-ingles>`
    (`NNN` é o número da task no GitHub Projects do repo, não o número do
    spec — os dois são numerados à parte) criada a partir de `develop`,
