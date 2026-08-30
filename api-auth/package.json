@@ -2,13 +2,16 @@
   "name": "payments-auth-api",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Payments API with in-memory auth - workshop reference project",
   "main": "src/server.ts",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts"
+    "start": "tsx src/server.ts",
+    "check": "node --experimental-test-coverage --test-coverage-functions=80 --test src/*.check.ts && tsc --noEmit"
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3"
   },
