@@ -1,18 +1,19 @@
+import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { accumulateToolCallDeltas, finalizeToolCalls, toOpenAIMessages } from './openrouter.ts'
+import { accumulateToolCallDeltas, finalizeToolCalls, streamOpenRouter, toOpenAIMessages } from './openrouter.ts'
 
-// tool call completo num chunk só
-{
+test('tool call completo num chunk só', () => {
   const acc = new Map<number, { name: string; arguments: string }>()
-  accumulateToolCallDeltas(acc, [{ index: 0, id: 'call_1', function: { name: 'listar_catalogo', arguments: '{"categoria":"eletronicos"}' } }])
+  accumulateToolCallDeltas(acc, [
+    { index: 0, id: 'call_1', function: { name: 'listar_catalogo', arguments: '{"categoria":"eletronicos"}' } },
+  ])
   const calls = finalizeToolCalls(acc)
   assert.equal(calls.length, 1)
   assert.equal(calls[0].function.name, 'listar_catalogo')
   assert.deepEqual(calls[0].function.arguments, { categoria: 'eletronicos' })
-}
+})
 
-// argumento fragmentado em 3 pedaços, nome só no primeiro delta
-{
+test('argumento fragmentado em 3 pedaços, nome só no primeiro delta', () => {
   const acc = new Map<number, { name: string; arguments: string }>()
   accumulateToolCallDeltas(acc, [{ index: 0, id: 'call_1', function: { name: 'registrar_intencao' } }])
   accumulateToolCallDeltas(acc, [{ index: 0, function: { arguments: '{"produto_id":"pr' } }])
@@ -22,10 +23,9 @@ import { accumulateToolCallDeltas, finalizeToolCalls, toOpenAIMessages } from '.
   assert.equal(calls.length, 1)
   assert.equal(calls[0].function.name, 'registrar_intencao')
   assert.deepEqual(calls[0].function.arguments, { produto_id: 'prod_003', quantidade: 2 })
-}
+})
 
-// duas tool calls no mesmo turno, deltas intercalados por índice
-{
+test('duas tool calls no mesmo turno, deltas intercalados por índice', () => {
   const acc = new Map<number, { name: string; arguments: string }>()
   accumulateToolCallDeltas(acc, [
     { index: 0, function: { name: 'listar_catalogo', arguments: '{}' } },
@@ -37,18 +37,16 @@ import { accumulateToolCallDeltas, finalizeToolCalls, toOpenAIMessages } from '.
   assert.equal(calls[0].function.name, 'listar_catalogo')
   assert.equal(calls[1].function.name, 'registrar_intencao')
   assert.deepEqual(calls[1].function.arguments, { produto_id: 'prod_001', quantidade: 1 })
-}
+})
 
-// argumento inválido não quebra — vira objeto vazio
-{
+test('argumento inválido não quebra — vira objeto vazio', () => {
   const acc = new Map<number, { name: string; arguments: string }>()
   accumulateToolCallDeltas(acc, [{ index: 0, function: { name: 'listar_catalogo', arguments: '{not json' } }])
   const calls = finalizeToolCalls(acc)
   assert.deepEqual(calls[0].function.arguments, {})
-}
+})
 
-// pareamento posicional de tool_call_id: assistant com 2 tool_calls + 2 mensagens tool
-{
+test('pareamento posicional de tool_call_id: assistant com 2 tool_calls + 2 mensagens tool', () => {
   const out = toOpenAIMessages([
     { role: 'user', content: 'quero comprar 2 fones e ver o catálogo' },
     {
@@ -69,6 +67,15 @@ import { accumulateToolCallDeltas, finalizeToolCalls, toOpenAIMessages } from '.
   assert.equal(out[2].tool_call_id, id1)
   assert.equal(out[3].tool_call_id, id2)
   assert.equal(out[1].tool_calls![1].function.arguments, JSON.stringify({ produto_id: 'prod_003', quantidade: 2 }))
-}
+})
 
-console.log('openrouter.ts ok')
+test('streamOpenRouter lança erro claro se OPENROUTER_API_KEY não estiver configurada', async () => {
+  const original = process.env.OPENROUTER_API_KEY
+  delete process.env.OPENROUTER_API_KEY
+  try {
+    const gen = streamOpenRouter([{ role: 'user', content: 'oi' }], undefined, new AbortController().signal)
+    await assert.rejects(() => gen.next(), /OPENROUTER_API_KEY/)
+  } finally {
+    if (original !== undefined) process.env.OPENROUTER_API_KEY = original
+  }
+})

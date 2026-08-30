@@ -1,5 +1,5 @@
-import { isOllamaReachable, streamOllama } from './ollama'
-import { streamOpenRouter } from './openrouter'
+import { isOllamaReachable, streamOllama } from './ollama.ts'
+import { streamOpenRouter } from './openrouter.ts'
 import type { StreamFn } from './types'
 
 let cached: StreamFn | undefined

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check": "node src/lib/llm/openrouter.check.ts && tsc --noEmit"
+    "check": "node --experimental-test-coverage --test-coverage-functions=80 --test src/lib/llm/*.check.ts && tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
