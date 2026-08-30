@@ -1,7 +1,18 @@
-# ollama-chat
+# chat-web
 
-Chat em Next.js que conversa com um modelo rodando localmente no Ollama, com streaming
-token a token e ferramentas vindas de um servidor MCP separado (`../ollama-tools`).
+Chat em Next.js que conversa com um LLM, com streaming token a token e
+ferramentas vindas de um servidor MCP separado (`../mcp-server`).
+
+Dois provedores de LLM, escolhidos automaticamente (ver
+`docs/adr/0002-provedor-llm-ollama-com-fallback-openrouter.md`):
+
+1. **Ollama local** (padrão) — usado se `OLLAMA_URL` responder.
+2. **OpenRouter** (fallback) — usado automaticamente se o Ollama não estiver
+   acessível. Precisa de `OPENROUTER_API_KEY` configurada.
+
+Essa escolha é feita **uma vez**, na primeira mensagem processada pelo
+servidor, e fica em cache pro resto do processo — reinicie `npm run dev`
+pra forçar uma nova checagem (ex.: depois de ligar o Ollama).
 
 São duas abas de conversa:
 
@@ -15,30 +26,33 @@ vive só na memória da aba, e some ao recarregar a página.
 
 ## Como rodar
 
-Três coisas precisam estar no ar. O Ollama normalmente já está (veja abaixo), então na
-prática são dois terminais:
-
 ```bash
 # terminal 1 — as ferramentas (servidor MCP)
-cd ../ollama-tools && npm install && npm start
+cd ../mcp-server && npm install && npm start
 
 # terminal 2 — o chat
-npm install && npm run dev
+npm install
+cp .env.example .env   # preencha OPENROUTER_API_KEY se não for usar Ollama
+npm run dev
 ```
 
 Abra [http://localhost:3000](http://localhost:3000).
 
-Suba o servidor de ferramentas **antes** de conversar.
+Suba o servidor de ferramentas **antes** de conversar. Ollama é opcional —
+se não estiver rodando, o chat cai automaticamente pro OpenRouter (ver
+acima), desde que `OPENROUTER_API_KEY` esteja configurada.
 
 ### Variáveis de ambiente
+
+Copie `.env.example` pra `.env` (carregado automaticamente via `dotenv`).
 
 | Variável | Padrão | O que é |
 | --- | --- | --- |
 | `OLLAMA_URL` | `http://localhost:11434` | Onde o Ollama escuta. |
-| `OLLAMA_MODEL` | `qwen2.5:14b` | Modelo usado. Precisa suportar ferramentas. |
+| `OLLAMA_MODEL` | `qwen2.5:14b` | Modelo usado no Ollama. Precisa suportar ferramentas. |
 | `MCP_URL` | `http://localhost:4000/mcp` | Servidor MCP com as ferramentas. |
-
-Coloque em `.env.local` se quiser mudar.
+| `OPENROUTER_API_KEY` | — (obrigatória pro fallback) | Chave gratuita em [openrouter.ai/keys](https://openrouter.ai/keys). |
+| `OPENROUTER_MODEL` | `openrouter/free` | Modelo usado no OpenRouter. `openrouter/free` é o auto-router que escolhe um modelo gratuito disponível no momento (o roster de free muda com frequência); free tier: 20 req/min, 200/dia. |
 
 ### Outros modelos que aceitam tools
 
@@ -97,8 +111,12 @@ body: JSON.stringify({ model: MODEL, messages: convo, tools, stream: true, keep_
 
 `src/app/api/chat/route.ts` é o único caminho até o modelo. Ele:
 
-1. Abre uma conexão MCP com o `ollama-tools` e traduz as ferramentas para o formato do Ollama.
-2. Chama o Ollama com `stream: true` e repassa os tokens para o navegador em NDJSON.
+1. Abre uma conexão MCP com o `mcp-server` e traduz as ferramentas pro
+   formato de function-calling (compatível com os dois provedores).
+2. Chama `pickProvider()` (`src/lib/llm/index.ts`), que decide entre Ollama
+   (`src/lib/llm/ollama.ts`) e OpenRouter (`src/lib/llm/openrouter.ts`) e
+   repassa os tokens pro navegador em NDJSON, independente de qual dos
+   dois respondeu.
 3. Se o modelo pedir uma ferramenta, executa via MCP, devolve o resultado para a conversa e
    chama o modelo de novo — no máximo `MAX_ROUNDS` vezes, senão ele fica em loop.
 4. Segura os primeiros tokens de cada rodada por `HOLD_MS`. Modelos pequenos costumam
