@@ -96,7 +96,14 @@ uma decisão daqui a duas semanas.
 - Decisões de arquitetura viram ADR (critério acima) — nunca fique só na
   conversa.
 - Tool ou regra de negócio nova vem com teste do caminho feliz e dos erros
-  esperados.
+  esperados, cobrindo no mínimo 80% das funções do módulo. Teste roda via
+  `node --test` (test runner nativo do Node, sem framework externo — ver
+  convenção em `CONTRIBUTING.md`); o `check` de cada pacote falha se a
+  cobertura de funções ficar abaixo de 80%
+  (`--test-coverage-functions=80`).
+- Antes de considerar qualquer tarefa de código finalizada, rode `npm run
+  check` (ou equivalente) em todo pacote alterado — não só nos arquivos
+  novos — e garanta que passa, testes e cobertura incluídos.
 - Nunca invente decisão de produto (preço, limite, regra de negócio) sem
   perguntar — isso é exatamente o que o `grill-me` existe pra evitar.
 - Validação de intenção e de limite de gasto nunca confia no que o modelo

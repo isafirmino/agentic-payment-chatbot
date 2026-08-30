@@ -87,11 +87,18 @@ precisam desse fluxo inteiro — vão direto pra um `fix:` numa branch curta.
   colateral real (`realizar_compra`). Isso vale mesmo que o prompt do
   modelo já "garanta" a regra — o backend nunca confia no que o LLM disse.
 - Toda tool/regra de negócio nova precisa de teste cobrindo o caminho feliz
-  e os casos de erro esperados (siga o padrão de `*.check.ts` já usado no
-  `mcp-server`). Lógica de negócio pura (cálculo de limite, validação de
-  intenção) ganha teste unitário; contrato entre serviços (payload de tool,
-  resposta de auth) ganha teste de integração; o resto pode ficar como
-  verificação manual documentada no `spec.md` da feature.
+  e os casos de erro esperados, cobrindo no mínimo 80% das funções do
+  módulo. Teste fica em `*.test.ts` ao lado do código (não numa pasta
+  `tests/` separada), usando o test runner nativo do Node (`node:test` +
+  `node:assert/strict`, sem framework externo) — mesmo padrão já usado no
+  `mcp-server`. O script `check` de cada pacote roda com
+  `--test-coverage-functions=80` e falha se a cobertura ficar abaixo disso.
+  Lógica de negócio pura (cálculo de limite, validação de intenção) ganha
+  teste unitário; contrato entre serviços (payload de tool, resposta de
+  auth) ganha teste de integração; o resto pode ficar como verificação
+  manual documentada no `spec.md` da feature.
+- Antes de finalizar qualquer tarefa de código, rode `npm run check` (ou
+  equivalente) em todo pacote alterado, não só nos arquivos novos.
 - Erros esperados (limite excedido, intenção inválida/expirada, não
   autenticado) são tratados como retorno de erro explícito, não exceção
   genérica engolida — quem chama (agente, frontend) precisa conseguir
