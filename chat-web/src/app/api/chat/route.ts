@@ -1,22 +1,20 @@
+import 'dotenv/config'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { pickProvider } from '@/lib/llm'
+import type { Message, ProviderTool, ToolCall } from '@/lib/llm/types'
 
-const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434'
-const MODEL = process.env.OLLAMA_MODEL ?? 'qwen2.5:14b'
-const MCP_URL = process.env.MCP_URL ?? 'http://localhost:4000/mcp'
 const HOLD_MS = 600
 const MAX_ROUNDS = 4
 
-type Message = { role: string; content: string; tool_calls?: ToolCall[] }
-type ToolCall = { function: { name: string; arguments: Record<string, unknown> } }
-
 async function connect() {
-  const client = new Client({ name: 'ollama-chat', version: '1.0.0' })
-  await client.connect(new StreamableHTTPClientTransport(new URL(MCP_URL)))
+  const mcpUrl = process.env.MCP_URL ?? 'http://localhost:4000/mcp'
+  const client = new Client({ name: 'chat-web', version: '1.0.0' })
+  await client.connect(new StreamableHTTPClientTransport(new URL(mcpUrl)))
   return client
 }
 
-function toOllamaTools(mcpTools: { name: string; description?: string; inputSchema: unknown }[]) {
+function toProviderTools(mcpTools: { name: string; description?: string; inputSchema: unknown }[]): ProviderTool[] {
   return mcpTools.map((t) => ({
     type: 'function',
     function: { name: t.name, description: t.description ?? '', parameters: t.inputSchema },
@@ -45,10 +43,10 @@ export async function POST(request: Request) {
   }
 
   let client: Client | undefined
-  let tools: unknown[] | undefined
+  let tools: ProviderTool[] | undefined
   try {
     client = await connect()
-    tools = toOllamaTools((await client.listTools()).tools)
+    tools = toProviderTools((await client.listTools()).tools)
   } catch {
     client = undefined
   }
@@ -61,20 +59,9 @@ export async function POST(request: Request) {
       const convo: Message[] = [...messages]
 
       try {
-        for (let round = 0; round < MAX_ROUNDS; round++) {
-          const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: MODEL, messages: convo, tools, stream: true }),
-            signal: request.signal,
-          })
-          if (!res.ok || !res.body) {
-            line({ error: `ollama: ${res.status} ${await res.text()}`, done: true })
-            break
-          }
+        const streamProvider = await pickProvider()
 
-          const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
-          let buffer = ''
+        for (let round = 0; round < MAX_ROUNDS; round++) {
           let content = ''
           const calls: ToolCall[] = []
           let held = ''
@@ -86,28 +73,19 @@ export async function POST(request: Request) {
             live = true
           }
 
-          for (;;) {
-            const { value, done } = await reader.read()
-            if (done) break
-            buffer += value
-            const parts = buffer.split('\n')
-            buffer = parts.pop() ?? ''
-            for (const part of parts) {
-              if (!part.trim()) continue
-              const chunk = JSON.parse(part)
-              const text = chunk.message?.content ?? ''
-              if (text) {
-                content += text
-                if (live) line(chunk)
-                else {
-                  held += text
-                  if (Date.now() - started > HOLD_MS) flush()
-                }
+          for await (const chunk of streamProvider(convo, tools, request.signal)) {
+            const text = chunk.message?.content ?? ''
+            if (text) {
+              content += text
+              if (live) line(chunk)
+              else {
+                held += text
+                if (Date.now() - started > HOLD_MS) flush()
               }
-              if (chunk.message?.tool_calls) {
-                calls.push(...chunk.message.tool_calls)
-                held = ''
-              }
+            }
+            if (chunk.message?.tool_calls) {
+              calls.push(...chunk.message.tool_calls)
+              held = ''
             }
           }
 

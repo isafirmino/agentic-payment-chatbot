@@ -6,10 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check": "node src/lib/llm/openrouter.check.ts && tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "dotenv": "^17.4.2",
     "next": "16.3.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
