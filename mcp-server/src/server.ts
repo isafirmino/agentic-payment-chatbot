@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { DEFAULT_TZ, getTime, listItems } from './tools.ts'
+import { getDb } from './db.ts'
 
 const PORT = Number(process.env.PORT ?? 4000)
 
@@ -43,5 +44,9 @@ app.post('/mcp', async (req, res) => {
   await mcp.connect(transport)
   await transport.handleRequest(req, res, req.body)
 })
+
+// Abre o banco antes de aceitar requisição: caminho inválido derruba o boot
+// em vez de falhar no meio de uma tool call.
+getDb()
 
 app.listen(PORT, () => console.log(`ollama-tools (MCP) on http://localhost:${PORT}/mcp`))
