@@ -1,52 +1,73 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import express from 'express'
 import { z } from 'zod'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
-import { DEFAULT_TZ, getTime, listItems } from './tools.ts'
+import { resolveCpf, resolveJwtSecret, Unauthorized } from './auth.ts'
 import { getDb } from './db.ts'
+import { bootstrapSchema, seedProducts } from './schema.ts'
+import { listarCatalogo, registrarIntencao } from './tools.ts'
 
 const PORT = Number(process.env.PORT ?? 4000)
+const JWT_SECRET = resolveJwtSecret()
+const requestIdentity = new AsyncLocalStorage<{ cpf: string }>()
 
-const mcp = new McpServer({ name: 'ollama-tools', version: '1.0.0' })
-
-mcp.registerTool(
-  'get_time',
-  {
-    description: `Data e hora atuais. Já retorna no horário de Brasília (UTC-3) por padrão.`,
-    inputSchema: {
-      timezone: z.string().optional().describe(`Fuso IANA, ex.: America/Sao_Paulo. Padrão: ${DEFAULT_TZ}.`),
-    },
-  },
-  async ({ timezone }) => json(getTime({ timezone }))
-)
-
-mcp.registerTool(
-  'list_items',
-  {
-    description: 'Lista os itens à venda e seus preços em reais. Opcionalmente filtra por nome.',
-    inputSchema: {
-      search: z.string().optional().describe('Trecho do nome do item, sem diferenciar maiúsculas.'),
-    },
-  },
-  async ({ search }) => json(listItems({ search }))
-)
+function currentCpf(): string {
+  const identity = requestIdentity.getStore()
+  if (!identity) throw new Error('missing authenticated request context')
+  return identity.cpf
+}
 
 function json(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value) }] }
 }
 
+const mcp = new McpServer({ name: 'catalog-purchase-intent', version: '1.0.0' })
+
+mcp.registerTool(
+  'listar_catalogo',
+  {
+    description: 'Lista os produtos disponíveis, opcionalmente filtrados por categoria.',
+    inputSchema: {
+      categoria: z.string().optional().describe('Categoria opcional, por exemplo: monitores.'),
+    },
+  },
+  async ({ categoria }) => json(listarCatalogo(getDb(), { categoria })),
+)
+
+mcp.registerTool(
+  'registrar_intencao',
+  {
+    description: 'Registra por cinco minutos a intenção de comprar um produto. Não realiza pagamento.',
+    inputSchema: {
+      produto_id: z.string().describe('Identificador de um produto do catálogo.'),
+      quantidade: z.number().describe('Quantidade desejada; a regra de inteiro positivo é validada no backend.'),
+    },
+  },
+  async ({ produto_id, quantidade }) =>
+    json(registrarIntencao(getDb(), currentCpf(), { produto_id, quantidade })),
+)
+
 const app = express()
 app.use(express.json())
 
 app.post('/mcp', async (req, res) => {
+  let cpf: string
+  try {
+    cpf = resolveCpf(req.headers.authorization, JWT_SECRET)
+  } catch (error) {
+    if (error instanceof Unauthorized) return res.status(401).json({ error: 'unauthorized' })
+    throw error
+  }
+
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
   res.on('close', () => transport.close())
   await mcp.connect(transport)
-  await transport.handleRequest(req, res, req.body)
+  await requestIdentity.run({ cpf }, () => transport.handleRequest(req, res, req.body))
 })
 
-// Abre o banco antes de aceitar requisição: caminho inválido derruba o boot
-// em vez de falhar no meio de uma tool call.
-getDb()
+const db = getDb()
+bootstrapSchema(db)
+seedProducts(db)
 
-app.listen(PORT, () => console.log(`ollama-tools (MCP) on http://localhost:${PORT}/mcp`))
+app.listen(PORT, () => console.log(`catalog-purchase-intent (MCP) on http://localhost:${PORT}/mcp`))
