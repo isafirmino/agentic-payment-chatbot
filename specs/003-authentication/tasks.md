@@ -108,7 +108,7 @@ Marque cada item conforme completa. Não avance para o próximo bloco sem finali
 ### Envio de token (`src/app/api/chat/route.ts`)
 
 - [x] Ler `Authorization` header: `request.headers.get('authorization')`
-- [ ] Repassar pro MCP: `new StreamableHTTPClientTransport({ url, requestInit: { headers: { Authorization: authHeader } } })`
+- [x] Repassar pro MCP: `new StreamableHTTPClientTransport({ url, requestInit: { headers: { Authorization: authHeader } } })`
 - [ ] Se sem header: retornar erro 401 (ou deixar vazio e MCP rejeita)
 
 ### Testes manuais
