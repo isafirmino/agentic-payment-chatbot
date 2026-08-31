@@ -14,7 +14,9 @@ async function connect(authHeader?: string) {
     authHeader
       ? { requestInit: { headers: { Authorization: authHeader } } }
       : undefined;
-  await client.connect(new StreamableHTTPClientTransport(new URL(mcpUrl), opts));
+  await client.connect(
+    new StreamableHTTPClientTransport(new URL(mcpUrl), opts),
+  );
   return client;
 }
 
