@@ -1,0 +1,5 @@
+# Banco SQLite compartilhado entre api-auth e mcp-server (ver ADR 0003).
+# É dado de execução, recriado no boot de cada serviço — nunca commitado.
+# Os arquivos -wal e -shm são do modo WAL, usado pra os dois processos
+# lerem e escreverem no mesmo arquivo.
+data/
