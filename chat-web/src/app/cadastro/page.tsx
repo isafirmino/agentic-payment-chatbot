@@ -18,7 +18,8 @@ export default function CadastroPage() {
     setCarregando(true);
 
     try {
-      const authUrl = process.env.NEXT_PUBLIC_AUTH_URL || "http://localhost:3001";
+      const authUrl =
+        process.env.NEXT_PUBLIC_AUTH_URL || "http://localhost:3001";
       const res = await fetch(`${authUrl}/auth/cadastro`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -85,7 +86,9 @@ export default function CadastroPage() {
           />
         </div>
 
-        {erro && <div style={{ color: "red", marginBottom: "15px" }}>{erro}</div>}
+        {erro && (
+          <div style={{ color: "red", marginBottom: "15px" }}>{erro}</div>
+        )}
 
         <button
           type="submit"
@@ -106,7 +109,10 @@ export default function CadastroPage() {
 
       <p style={{ marginTop: "20px", textAlign: "center" }}>
         Já tem conta?{" "}
-        <Link href="/login" style={{ color: "#007bff", textDecoration: "none" }}>
+        <Link
+          href="/login"
+          style={{ color: "#007bff", textDecoration: "none" }}
+        >
           Faça login
         </Link>
       </p>

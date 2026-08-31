@@ -1,16 +1,20 @@
 # ADR 0003: JWT com CPF como subject e limite de gasto no backend
 
 ## Status
+
 **Accepted**
 
 ## Context
+
 A autenticação no desafio de pagamentos requer:
+
 1. Login com CPF e senha
 2. Emissão de JWT para autenticar requisições no agente
 3. Validação de limite de gasto antes de executar compras
 4. Múltiplos serviços (api-auth, mcp-server) compartilhando JWT_SECRET
 
 ## Decision
+
 1. **JWT Subject = CPF**: Usar o CPF como `sub` claim no JWT, sem role ou limite no payload
    - Razão: CPF é o único identificador único do usuário no contexto do desafio
    - Sem role: desafio não define autorização por papel
@@ -36,6 +40,7 @@ A autenticação no desafio de pagamentos requer:
    - Foreign keys ON para integridade referencial
 
 ## Consequences
+
 - ✅ Simples: apenas 1 subject (CPF), sem roles/scopes/claims extras
 - ✅ Seguro: limite sempre validado no backend, modelo não pode bypassar
 - ✅ Operacional: token expirado força novo login, sem complexidade de refresh
@@ -43,6 +48,7 @@ A autenticação no desafio de pagamentos requer:
 - ⚠️ Risco: limite muda apenas por checkout, sem cache entre requisições
 
 ## Alternatives Considered
+
 1. **JWT com role + limite no payload**
    - Rejeitada: complexidade desnecessária, limite pode expirar, modelo poderia abusar
 
@@ -53,6 +59,7 @@ A autenticação no desafio de pagamentos requer:
    - Rejeitada: contratos entre serviços ficam complexos, violaria arquitetura de Task #0
 
 ## References
+
 - [specs/003-authentication/spec.md](../specs/003-authentication/spec.md)
 - [specs/003-authentication/plan.md](../specs/003-authentication/plan.md)
 - [ADR 0001: Base a partir dos workshops](./0001-base-a-partir-dos-workshops.md)

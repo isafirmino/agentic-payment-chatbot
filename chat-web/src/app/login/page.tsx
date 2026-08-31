@@ -23,7 +23,8 @@ export default function LoginPage() {
     setCarregando(true);
 
     try {
-      const authUrl = process.env.NEXT_PUBLIC_AUTH_URL || "http://localhost:3001";
+      const authUrl =
+        process.env.NEXT_PUBLIC_AUTH_URL || "http://localhost:3001";
       const res = await fetch(`${authUrl}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -83,7 +84,9 @@ export default function LoginPage() {
           />
         </div>
 
-        {erro && <div style={{ color: "red", marginBottom: "15px" }}>{erro}</div>}
+        {erro && (
+          <div style={{ color: "red", marginBottom: "15px" }}>{erro}</div>
+        )}
 
         <button
           type="submit"
@@ -104,7 +107,10 @@ export default function LoginPage() {
 
       <p style={{ marginTop: "20px", textAlign: "center" }}>
         Não tem conta?{" "}
-        <Link href="/cadastro" style={{ color: "#007bff", textDecoration: "none" }}>
+        <Link
+          href="/cadastro"
+          style={{ color: "#007bff", textDecoration: "none" }}
+        >
           Cadastre-se
         </Link>
       </p>

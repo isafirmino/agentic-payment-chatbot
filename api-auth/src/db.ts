@@ -13,7 +13,10 @@ const PACKAGE_ROOT = join(import.meta.dirname, "..");
  * banco vazio em vez de reclamar — `api-auth` e `mcp-server` passariam a usar
  * bancos diferentes sem nenhum erro visível. Ver ADR 0003.
  */
-export function resolveDatabasePath(raw: string | undefined, packageRoot: string): string {
+export function resolveDatabasePath(
+  raw: string | undefined,
+  packageRoot: string,
+): string {
   const value = raw?.trim() ? raw.trim() : DEFAULT_DATABASE_PATH;
   // :memory: é um identificador especial do SQLite, não um caminho de arquivo
   if (value === ":memory:") {
