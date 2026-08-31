@@ -1,6 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Markdown from 'react-markdown'
 
 type Role = 'system' | 'user' | 'assistant'
@@ -24,6 +25,8 @@ const CHATS: { id: ChatId; label: string }[] = [
 ]
 
 export default function Page() {
+  const router = useRouter()
+  const [autenticado, setAutenticado] = useState(false)
   const [chats, setChats] = useState<Record<ChatId, Turn[]>>({
     stateless: [],
     withHistory: [],
@@ -33,6 +36,21 @@ export default function Page() {
   const [busy, setBusy] = useState(false)
   const [peek, setPeek] = useState<number | null>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  // Gate: checa autenticação no mount
+  useEffect(() => {
+    const session = localStorage.getItem('chat_session')
+    if (!session) {
+      router.push('/login')
+    } else {
+      setAutenticado(true)
+    }
+  }, [router])
+
+  // Se não autenticado, não renderiza o chat
+  if (!autenticado) {
+    return <div>Redirecionando...</div>
+  }
 
   const messages = chats[active]
 
@@ -65,9 +83,16 @@ export default function Page() {
     setBusy(true)
 
     try {
+      // Extrai token da session
+      const session = JSON.parse(localStorage.getItem('chat_session') || '{}')
+      const token = session?.token || ''
+
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
         body: JSON.stringify({ messages: payload }),
       })
       if (!res.ok || !res.body) throw new Error(await res.text())

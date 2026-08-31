@@ -7,10 +7,19 @@ import type { Message, ProviderTool, ToolCall } from '@/lib/llm/types'
 const HOLD_MS = 600
 const MAX_ROUNDS = 4
 
-async function connect() {
+async function connect(authHeader?: string) {
   const mcpUrl = process.env.MCP_URL ?? 'http://localhost:4000/mcp'
   const client = new Client({ name: 'chat-web', version: '1.0.0' })
-  await client.connect(new StreamableHTTPClientTransport(new URL(mcpUrl)))
+  
+  // Prepara headers pra StreamableHTTPClientTransport
+  const requestInit: RequestInit = {}
+  if (authHeader) {
+    requestInit.headers = {
+      'Authorization': authHeader,
+    }
+  }
+  
+  await client.connect(new StreamableHTTPClientTransport(new URL(mcpUrl), requestInit))
   return client
 }
 
@@ -42,10 +51,13 @@ export async function POST(request: Request) {
     return Response.json({ error: 'messages must be a non-empty array' }, { status: 400 })
   }
 
+  // Extrai Authorization header do request
+  const authHeader = request.headers.get('authorization') || undefined
+
   let client: Client | undefined
   let tools: ProviderTool[] | undefined
   try {
-    client = await connect()
+    client = await connect(authHeader)
     tools = toProviderTools((await client.listTools()).tools)
   } catch {
     client = undefined
