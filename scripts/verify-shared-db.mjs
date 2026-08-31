@@ -14,12 +14,19 @@
 
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { getDb as getAuthDb, resolveDatabasePath } from '../api-auth/src/db.ts'
-import { getDb as getMcpDb } from '../mcp-server/src/db.ts'
+import { getDb as getAuthDb, resolveDatabasePath as resolveAuth } from '../api-auth/src/db.ts'
+import { getDb as getMcpDb, resolveDatabasePath as resolveMcp } from '../mcp-server/src/db.ts'
 
 const TABELA = '_verificacao_ambiente'
 const RAIZ_REPO = join(import.meta.dirname, '..')
-const SERVICOS = ['api-auth', 'mcp-server']
+
+// Cada serviço é resolvido pela SUA própria cópia de resolveDatabasePath: usar
+// a de um só pros dois deixaria passar justamente a divergência entre os dois
+// db.ts duplicados que este script existe pra pegar.
+const SERVICOS = [
+  { nome: 'api-auth', resolver: resolveAuth },
+  { nome: 'mcp-server', resolver: resolveMcp },
+]
 
 class FalhaDeVerificacao extends Error {}
 
@@ -34,6 +41,9 @@ function falhar(mensagem) {
  * raiz do repo, e o `dotenv/config` dos db.ts carrega o .env do diretório de
  * execução — nunca o de cada serviço. Cobre o que o dotenv aceita e aparece
  * num .env de verdade: prefixo `export` e valor entre aspas.
+ *
+ * Um `.env` por serviço é o que o `npm run dev` de cada um enxerga, porque
+ * ali o diretório de execução é o do próprio serviço.
  */
 function databasePathDeclarado(servico) {
   let conteudo
@@ -61,11 +71,11 @@ let mcpDb
 try {
   console.log('1. DATABASE_PATH declarado no .env de cada serviço\n')
 
-  const declarados = SERVICOS.map((servico) => {
-    const bruto = databasePathDeclarado(servico)
+  const declarados = SERVICOS.map(({ nome, resolver }) => {
+    const bruto = databasePathDeclarado(nome)
     const origem = bruto === undefined ? '(sem .env — usando o padrão)' : bruto
-    const efetivo = resolveDatabasePath(bruto, join(RAIZ_REPO, servico))
-    console.log(`   ${servico.padEnd(10)} ${origem}\n   ${' '.repeat(10)} -> ${efetivo}`)
+    const efetivo = resolver(bruto, join(RAIZ_REPO, nome))
+    console.log(`   ${nome.padEnd(10)} ${origem}\n   ${' '.repeat(10)} -> ${efetivo}`)
     return efetivo
   })
 
@@ -79,6 +89,14 @@ try {
   }
 
   console.log('\n2. Arquivo que cada conexão abre de fato\n')
+
+  // Sem isto, a etapa 2 testaria sempre o caminho padrão: o `dotenv/config`
+  // dentro de cada db.ts procura o .env no diretório de execução (a raiz do
+  // repo, quando o script roda daqui), não no diretório de cada serviço.
+  // Com um DATABASE_PATH customizado nos .env, as etapas 2 e 3 abririam o
+  // arquivo padrão e aprovariam um banco que os serviços nunca usam.
+  // `declarados[0]` já é absoluto e igual ao [1] — a checagem acima garante.
+  process.env.DATABASE_PATH = declarados[0]
 
   authDb = getAuthDb()
   mcpDb = getMcpDb()
