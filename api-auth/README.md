@@ -13,8 +13,37 @@ npm run dev     # http://localhost:3000
 |----------|---------|-----------|
 | `PORT` | `3000` | porta HTTP |
 | `JWT_SECRET` | `workshop-dev-secret-do-not-use-in-prod` | chave de assinatura. Mude em qualquer uso real — quem tem o secret forja token de admin. Trocar o secret invalida todos os tokens emitidos. |
+| `DATABASE_PATH` | `../data/app.db` | banco SQLite compartilhado com o `mcp-server` — ver abaixo |
 
 Tokens expiram em **1h** (`expiresIn` vem na resposta do login).
+
+## Banco compartilhado
+
+Este serviço e o `mcp-server` leem e escrevem no **mesmo arquivo** SQLite
+(ver [ADR 0003](../docs/adr/0003-sqlite-compartilhado-entre-servicos.md)).
+Antes de subir, copie o exemplo de configuração:
+
+```bash
+cp .env.example .env
+```
+
+`DATABASE_PATH` é resolvido a partir da raiz **deste pacote**, não de onde
+você rodou o comando — então o padrão `../data/app.db` cai sempre em
+`<repo>/data/app.db`. Se mudar aqui, mude igual no `.env` do `mcp-server`:
+os dois precisam do mesmo arquivo, senão o limite de gasto gravado no
+cadastro não é o mesmo que a compra valida.
+
+Pra conferir que está tudo certo, a partir da raiz do repositório:
+
+```bash
+node scripts/verify-shared-db.mjs
+```
+
+A divisão de tabelas é: `usuarios` pertence a este serviço; `produtos`,
+`intencoes` e `transacoes` pertencem ao `mcp-server`. Cada serviço cria as
+suas no próprio boot, com `CREATE TABLE IF NOT EXISTS` — não há migration
+compartilhada. Nenhuma delas existe ainda: cada uma chega junto com a
+feature que a implementa.
 
 ## Usuários
 

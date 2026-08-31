@@ -4,9 +4,16 @@ Fatos verificados neste ambiente antes de planejar (Node v24.18.0):
 
 - `node:sqlite` funciona sem flag e sem warning nos dois runners: `tsx`
   (`api-auth`) e `node` com type stripping nativo (`mcp-server`).
-- `api-auth` roda como **CommonJS** (não tem `"type": "module"` no
-  `package.json`): `__dirname` existe, `import.meta.dirname` não.
-- `mcp-server` roda como **ESM** (`"type": "module"`): o inverso.
+- `mcp-server` roda como **ESM** (`"type": "module"` declarado):
+  `import.meta.dirname` funciona.
+- `api-auth` **não declarava tipo de módulo**, e por isso os dois runners
+  discordavam sobre ele: o `tsx` tratava os arquivos como CommonJS
+  (`__dirname` definido) enquanto o `node` os reinterpretava como ESM
+  (aviso `MODULE_TYPELESS_PACKAGE_JSON`), onde `__dirname` não existe.
+  Nenhum dos dois idiomas funcionava nos dois runners. Corrigido
+  declarando `"type": "module"`, que é o que o código do pacote já era na
+  prática — ele sempre usou `import`/`export` e extensão `.js` nos
+  imports relativos.
 - `node --test` com cobertura roda `.ts` importando `.ts` nos dois
   pacotes; no `api-auth` o `tsc --noEmit` recusa o import com extensão
   `.ts` até `allowImportingTsExtensions` ser ligado (erro TS5097) — mesma
@@ -63,10 +70,10 @@ inválido. Não criar tabela nenhuma aqui.
 
 ### 5. Módulo de conexão — `api-auth/src/db.ts`
 
-Mesmo conteúdo do item 2, com duas diferenças obrigatórias pelo ambiente:
+Mesmo conteúdo do item 2, com duas diferenças:
 
-- raiz do pacote vem de `path.join(__dirname, '..')`, porque `api-auth` é
-  CommonJS e não tem `import.meta`;
+- `api-auth/package.json` precisa declarar `"type": "module"` antes, senão
+  `import.meta.dirname` não funciona sob `node --test` (ver fatos acima);
 - estilo do arquivo segue o do pacote (aspas duplas, ponto e vírgula,
   como em `api-auth/src/app.ts`).
 
