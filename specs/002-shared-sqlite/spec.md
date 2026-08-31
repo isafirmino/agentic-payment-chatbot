@@ -93,6 +93,12 @@ precisa decidir biblioteca, caminho, nem configuração de conexão.
   pacotes (testes com cobertura mínima de funções e checagem de tipos).
   Hoje ele não tem nenhum, o que torna impossível cumprir a regra do
   `CONTRIBUTING.md` de rodar a verificação em todo pacote alterado.
+- **`api-auth` passa a declarar explicitamente que é um pacote ESM.** Ele já
+  escrevia código nesse formato sem declarar nada, e isso fazia os dois
+  runners que o pacote usa discordarem sobre como interpretá-lo — o que
+  quebra qualquer forma de descobrir o diretório do próprio módulo, algo
+  que a resolução do caminho do banco precisa. Descoberto durante a
+  implementação, não previsto no planejamento inicial.
 
 ## Decisões de teste
 
