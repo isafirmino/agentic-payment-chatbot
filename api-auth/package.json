@@ -8,7 +8,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
-    "check": "node --experimental-test-coverage --test-coverage-functions=80 --test src/*.check.ts && tsc --noEmit"
+    "build": "tsc -p tsconfig.build.json",
+    "check": "npm run build && node --experimental-test-coverage --test-coverage-functions=80 --test dist/*.check.js dist/*.test.js && tsc --noEmit"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

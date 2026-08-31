@@ -15,6 +15,10 @@ const PACKAGE_ROOT = join(import.meta.dirname, "..");
  */
 export function resolveDatabasePath(raw: string | undefined, packageRoot: string): string {
   const value = raw?.trim() ? raw.trim() : DEFAULT_DATABASE_PATH;
+  // :memory: é um identificador especial do SQLite, não um caminho de arquivo
+  if (value === ":memory:") {
+    return value;
+  }
   return resolve(packageRoot, value);
 }
 

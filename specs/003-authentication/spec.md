@@ -7,6 +7,7 @@ O chat (`chat-web`) não tem nenhuma barreira de acesso — qualquer pessoa cons
 ## Solução
 
 Sistema de autenticação JWT com:
+
 - Cadastro de novo usuário (nome, CPF, senha)
 - Login com CPF e senha
 - Token JWT que identifica o usuário (`sub=cpf`, 1h expiração)
@@ -22,6 +23,7 @@ Sistema de autenticação JWT com:
 5. Como agente MCP, eu quero consultar o limite de gasto de um usuário, para que eu possa validar se uma compra é permitida.
 
 **Casos de erro:**
+
 - Cadastro com CPF duplicado → erro explícito no frontend
 - Login com CPF/senha errada → erro explícito no frontend
 - Token expirado → redireciona pra login com mensagem
@@ -29,6 +31,7 @@ Sistema de autenticação JWT com:
 ## Decisões de implementação
 
 **Backend (`api-auth/`):**
+
 - Tabela `usuarios(cpf TEXT PRIMARY KEY, nome TEXT NOT NULL, password_hash TEXT NOT NULL, limite_cents INTEGER NOT NULL DEFAULT 100000)` no SQLite (compartilhado via Task 0)
 - `POST /auth/cadastro` (nome, cpf, senha) → grava usuário, rejeita CPF duplicado
 - `POST /auth/login` (cpf, senha) → valida, emite JWT com `{ sub: cpf, expiresIn: '1h' }`
@@ -38,6 +41,7 @@ Sistema de autenticação JWT com:
 - `JWT_SECRET` documentado no `.env.example` como compartilhado com `mcp-server`
 
 **Frontend (`chat-web/`):**
+
 - `src/app/cadastro/page.tsx` (novo): form nome/CPF/senha → `POST /auth/cadastro` → redireciona pra login
 - `src/app/login/page.tsx` (novo): form CPF/senha → `POST /auth/login` → grava `{ token, cpf, nome }` em `localStorage` → redireciona pra `/`
 - `src/app/page.tsx` (modificado): gate client-side — se sem `localStorage['chat_session']`, redireciona pra `/login`
@@ -45,6 +49,7 @@ Sistema de autenticação JWT com:
 - Env var `NEXT_PUBLIC_AUTH_URL` (ex.: `http://localhost:3001`)
 
 **Contrato MCP:**
+
 - `mcp-server` recebe JWT no header `Authorization: Bearer <token>`, extrai CPF do `sub`
 - Antes de `realizar_compra`, valida limite consultando `GET /usuarios/me/limite` em `api-auth`
 

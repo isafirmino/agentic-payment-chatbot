@@ -34,17 +34,17 @@ Implementação em duas frentes paralelas: backend (`api-auth/`) e frontend (`ch
 
 ## Mudanças de arquivo
 
-| Arquivo | Ação | Detalhes |
-|---------|------|----------|
-| `api-auth/src/app.ts` | modificar | Tabela usuarios no bootstrap, endpoints `/auth/cadastro`, `/auth/login`, `GET /usuarios/me/limite` |
-| `api-auth/src/app.test.ts` | criar | Testes unitários (80% cobertura) |
-| `api-auth/.env.example` | modificar | Documentar `JWT_SECRET` como compartilhado |
-| `chat-web/src/app/cadastro/page.tsx` | criar | Nova página de cadastro |
-| `chat-web/src/app/login/page.tsx` | criar | Nova página de login |
-| `chat-web/src/app/page.tsx` | modificar | Gate client-side com useEffect |
-| `chat-web/src/app/api/chat/route.ts` | modificar | Passar header Authorization pro MCP |
-| `chat-web/.env.example` | modificar | Adicionar `NEXT_PUBLIC_AUTH_URL` |
-| `docs/adr/0003-authentication-jwt-cpf.md` | criar | ADR registrando JWT sub=cpf, DEFAULT_LIMITE, compartilhamento de JWT_SECRET |
+| Arquivo                                   | Ação      | Detalhes                                                                                           |
+| ----------------------------------------- | --------- | -------------------------------------------------------------------------------------------------- |
+| `api-auth/src/app.ts`                     | modificar | Tabela usuarios no bootstrap, endpoints `/auth/cadastro`, `/auth/login`, `GET /usuarios/me/limite` |
+| `api-auth/src/app.test.ts`                | criar     | Testes unitários (80% cobertura)                                                                   |
+| `api-auth/.env.example`                   | modificar | Documentar `JWT_SECRET` como compartilhado                                                         |
+| `chat-web/src/app/cadastro/page.tsx`      | criar     | Nova página de cadastro                                                                            |
+| `chat-web/src/app/login/page.tsx`         | criar     | Nova página de login                                                                               |
+| `chat-web/src/app/page.tsx`               | modificar | Gate client-side com useEffect                                                                     |
+| `chat-web/src/app/api/chat/route.ts`      | modificar | Passar header Authorization pro MCP                                                                |
+| `chat-web/.env.example`                   | modificar | Adicionar `NEXT_PUBLIC_AUTH_URL`                                                                   |
+| `docs/adr/0003-authentication-jwt-cpf.md` | criar     | ADR registrando JWT sub=cpf, DEFAULT_LIMITE, compartilhamento de JWT_SECRET                        |
 
 ## Dependências externas
 
