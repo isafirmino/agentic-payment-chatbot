@@ -7,19 +7,10 @@ import type { Message, ProviderTool, ToolCall } from '@/lib/llm/types'
 const HOLD_MS = 600
 const MAX_ROUNDS = 4
 
-async function connect(authHeader?: string) {
+async function connect() {
   const mcpUrl = process.env.MCP_URL ?? 'http://localhost:4000/mcp'
   const client = new Client({ name: 'chat-web', version: '1.0.0' })
-  
-  // Prepara headers pra StreamableHTTPClientTransport
-  const requestInit: RequestInit = {}
-  if (authHeader) {
-    requestInit.headers = {
-      'Authorization': authHeader,
-    }
-  }
-  
-  await client.connect(new StreamableHTTPClientTransport(new URL(mcpUrl), requestInit))
+  await client.connect(new StreamableHTTPClientTransport(new URL(mcpUrl)))
   return client
 }
 
@@ -52,12 +43,14 @@ export async function POST(request: Request) {
   }
 
   // Extrai Authorization header do request
-  const authHeader = request.headers.get('authorization') || undefined
+  // TODO: passar para mcp-server quando Task B (mcp-server) suportar autenticação
+  const authHeader = request.headers.get('authorization')
+  console.log('[auth]', authHeader ? 'present' : 'missing')
 
   let client: Client | undefined
   let tools: ProviderTool[] | undefined
   try {
-    client = await connect(authHeader)
+    client = await connect()
     tools = toProviderTools((await client.listTools()).tools)
   } catch {
     client = undefined
