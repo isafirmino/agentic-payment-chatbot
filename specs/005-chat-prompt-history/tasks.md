@@ -20,6 +20,11 @@
 - [x] Remover os botões de troca de modo e o texto condicional de tela vazia
 - [x] Permitir fixar o painel "Enviado ao modelo" com um clique, mantendo o
       comportamento de passar o mouse
+- [x] Incluir as chamadas de ferramenta e seus resultados no histórico dos
+      turnos seguintes (`toHistory`), fechando a segunda metade do critério
+      obrigatório do desafio, com teste cobrindo a expansão e a ordem
+- [x] Registrar no `spec.md` a sugestão de abrir o painel pelo teclado como
+      melhoria pós-entrega
 - [x] Rodar `npm run check` e `npm run lint` no `chat-web` e garantir que
       passam
 - [x] Verificar que a página sobe e que o seletor sumiu do HTML servido

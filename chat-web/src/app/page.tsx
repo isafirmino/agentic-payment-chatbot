@@ -2,11 +2,7 @@
 
 import { useRef, useState } from 'react'
 import Markdown from 'react-markdown'
-import { buildPayload } from '@/lib/chat/payload'
-import type { Message } from '@/lib/llm/types'
-
-type ToolRun = { name: string; arguments: Record<string, unknown>; result: unknown }
-type Turn = Message & { sent?: Message[]; tools?: ToolRun[] }
+import { buildPayload, toHistory, type Turn } from '@/lib/chat/payload'
 
 export default function Page() {
   const [messages, setMessages] = useState<Turn[]>([])
@@ -37,8 +33,7 @@ export default function Page() {
     e.preventDefault()
     if (!input.trim() || busy) return
 
-    const history = messages.map(({ role, content, tool_calls }) => ({ role, content, tool_calls }))
-    const payload = buildPayload(history, input)
+    const payload = buildPayload(toHistory(messages), input)
     const turn: Turn = { role: 'user', content: input, sent: payload }
     const next: Turn[] = [...messages, turn]
 

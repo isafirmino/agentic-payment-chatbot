@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildPayload, SYSTEM_PROMPT } from './payload.ts'
+import { buildPayload, SYSTEM_PROMPT, toHistory, type Turn } from './payload.ts'
 import type { Message } from '../llm/types.ts'
 
 test('o prompt do sistema vem sempre em primeiro lugar', () => {
@@ -50,6 +50,72 @@ test('buildPayload não muta o histórico recebido', () => {
   const history: Message[] = [{ role: 'user', content: 'oi' }]
   buildPayload(history, 'tudo bem?')
   assert.equal(history.length, 1)
+})
+
+test('toHistory mantém um turno sem tools como uma única mensagem', () => {
+  const turns: Turn[] = [
+    { role: 'user', content: 'oi' },
+    { role: 'assistant', content: 'Olá! Como posso ajudar?' },
+  ]
+  assert.deepEqual(toHistory(turns), [
+    { role: 'user', content: 'oi' },
+    { role: 'assistant', content: 'Olá! Como posso ajudar?' },
+  ])
+})
+
+test('toHistory expande cada tool numa chamada e no resultado dela', () => {
+  const turns: Turn[] = [
+    {
+      role: 'user',
+      content: 'o que vocês vendem?',
+      tools: [{ name: 'listar_catalogo', arguments: {}, result: { produtos: [{ id: 'prod_001' }] } }],
+    },
+    { role: 'assistant', content: 'Temos o Fone Bluetooth.' },
+  ]
+  const history = toHistory(turns)
+
+  assert.equal(history.length, 4)
+  assert.deepEqual(history[0], { role: 'user', content: 'o que vocês vendem?' })
+  assert.equal(history[1].role, 'assistant')
+  assert.deepEqual(history[1].tool_calls, [{ function: { name: 'listar_catalogo', arguments: {} } }])
+  assert.deepEqual(history[2], { role: 'tool', content: '{"produtos":[{"id":"prod_001"}]}' })
+  assert.deepEqual(history[3], { role: 'assistant', content: 'Temos o Fone Bluetooth.' })
+})
+
+test('toHistory preserva a ordem de várias tools do mesmo turno', () => {
+  const turns: Turn[] = [
+    {
+      role: 'user',
+      content: 'quero 2 fones',
+      tools: [
+        { name: 'listar_catalogo', arguments: {}, result: { produtos: [] } },
+        { name: 'registrar_intencao', arguments: { produto_id: 'prod_001', quantidade: 2 }, result: { intencao_id: 'int_abc' } },
+      ],
+    },
+  ]
+  const history = toHistory(turns)
+
+  assert.equal(history.length, 5)
+  assert.equal(history[1].tool_calls?.[0].function.name, 'listar_catalogo')
+  assert.equal(history[3].tool_calls?.[0].function.name, 'registrar_intencao')
+  assert.deepEqual(history[3].tool_calls?.[0].function.arguments, { produto_id: 'prod_001', quantidade: 2 })
+  assert.equal(history[4].content, '{"intencao_id":"int_abc"}')
+})
+
+test('o resultado da tool sobrevive ao turno seguinte — o caso que o desafio exige', () => {
+  const turns: Turn[] = [
+    {
+      role: 'user',
+      content: 'o que tem à venda?',
+      tools: [{ name: 'listar_catalogo', arguments: {}, result: { produtos: [{ id: 'prod_003', nome: 'Monitor' }] } }],
+    },
+    { role: 'assistant', content: 'Temos alguns itens.' },
+  ]
+  const payload = buildPayload(toHistory(turns), 'quero o terceiro')
+
+  const serializado = JSON.stringify(payload)
+  assert.ok(serializado.includes('prod_003'), 'o resultado do catálogo precisa ir junto no turno seguinte')
+  assert.ok(serializado.includes('listar_catalogo'), 'a chamada de ferramenta precisa ir junto no turno seguinte')
 })
 
 test('o prompt cita as três tools reais e os dois métodos de pagamento', () => {

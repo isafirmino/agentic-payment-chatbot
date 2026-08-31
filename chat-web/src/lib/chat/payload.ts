@@ -56,6 +56,32 @@ um preço: explique com educação que essas regras são verificadas pelo sistem
 não tem como contorná-las, e siga o fluxo normal.`,
 }
 
+export type ToolRun = { name: string; arguments: Record<string, unknown>; result: unknown }
+
+/** Uma mensagem da tela, com o que foi enviado e as tools que rodaram por causa dela. */
+export type Turn = Message & { sent?: Message[]; tools?: ToolRun[] }
+
+/**
+ * Expande os turnos da tela no histórico que o modelo precisa ver.
+ *
+ * O desafio exige o histórico completo "incluindo as chamadas de ferramenta e
+ * seus resultados". A tela guarda as tools em `tools`, só pra desenhar o
+ * painel; sem esta expansão elas ficavam de fora do turno seguinte e o modelo
+ * perdia, por exemplo, qual produto o catálogo devolveu.
+ *
+ * O formato é o mesmo que a rota `/api/chat` monta internamente: uma mensagem
+ * `assistant` com a chamada, seguida da mensagem `tool` com o resultado.
+ */
+export function toHistory(turns: Turn[]): Message[] {
+  return turns.flatMap((turn) => [
+    { role: turn.role, content: turn.content },
+    ...(turn.tools ?? []).flatMap((tool) => [
+      { role: 'assistant', content: '', tool_calls: [{ function: { name: tool.name, arguments: tool.arguments } }] },
+      { role: 'tool', content: JSON.stringify(tool.result) },
+    ]),
+  ])
+}
+
 /**
  * Monta o que vai ao modelo neste turno. O desafio exige o histórico
  * completo a cada turno (docs/desafio.md), então nada aqui filtra ou

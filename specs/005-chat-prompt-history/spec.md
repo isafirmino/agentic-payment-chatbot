@@ -68,6 +68,17 @@ capturas de tela da entrega verificáveis em vez de só afirmadas.
   mensagem do usuário e devolve a lista completa a enviar. Isso existe para
   que o critério obrigatório do desafio deixe de depender de inspeção
   visual e passe a ter teste automatizado.
+- **As chamadas de ferramenta e seus resultados passam a fazer parte do
+  histórico** enviado nos turnos seguintes. O desafio exige o histórico
+  completo "incluindo as chamadas de ferramenta e seus resultados", e essa
+  segunda metade não era cumprida: o backend montava a sequência
+  corretamente dentro de uma requisição, mas ela era descartada ao fim da
+  resposta, e a tela guardava as ferramentas apenas para desenhar o painel.
+  Na prática o agente perdia, no turno seguinte, o que o catálogo tinha
+  devolvido. A expansão dos turnos da tela para essa sequência é feita no
+  mesmo módulo testável, no formato que a rota já usa internamente: uma
+  mensagem do assistente com a chamada, seguida de uma mensagem com o
+  resultado.
 - **O prompt do sistema passa a ser dado desse mesmo módulo**, não texto
   solto dentro do componente, para poder ser verificado por teste.
 - **O prompt descreve as três ferramentas pelo nome real**, a ordem
@@ -98,6 +109,12 @@ capturas de tela da entrega verificáveis em vez de só afirmadas.
   histórico inteiro é preservado na ordem original; a nova mensagem do
   usuário entra por último; conversa vazia produz apenas prompt e mensagem;
   e o histórico não é truncado conforme cresce.
+- **Teste da expansão das chamadas de ferramenta no histórico**: turno sem
+  ferramenta continua sendo uma mensagem só; turno com ferramenta vira a
+  chamada mais o resultado, nessa ordem; várias ferramentas no mesmo turno
+  preservam a ordem entre si. E um teste escrito na forma do critério do
+  desafio: depois de o catálogo ter respondido, o identificador do produto
+  ainda precisa estar no que é enviado no turno seguinte.
 - **Teste do conteúdo do prompt**, afirmando que ele cita as três
   ferramentas reais, os dois métodos de pagamento, e que não sobrou
   nenhuma menção às ferramentas do workshop. É o tipo de coisa que se perde
@@ -124,3 +141,17 @@ capturas de tela da entrega verificáveis em vez de só afirmadas.
 - Limitar o tamanho do histórico enviado. O desafio pede o histórico
   completo, e conversas de demonstração não chegam perto do limite de
   contexto.
+
+## Melhorias sugeridas para depois da entrega
+
+Coisas notadas durante esta feature que não valem o custo agora, mas que
+alguém deveria pegar quando a base do projeto estiver pronta:
+
+- **Abrir o painel de inspeção pelo teclado.** A mensagem do usuário virou
+  clicável, mas continua sendo um elemento sem papel de botão: não dá para
+  chegar nela com Tab nem acionar com Enter. Quem usa leitor de tela ou
+  navega só pelo teclado não alcança o painel. A correção é pequena (papel,
+  índice de tabulação e tratador de tecla), mas mexer em acessibilidade no
+  meio da entrega é risco sem retorno — o desafio não avalia isso, e a
+  mudança pede um teste manual que hoje ninguém faria. Vale fazer junto com
+  uma passada geral de acessibilidade, não isolada.
