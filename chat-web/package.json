@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check": "node --experimental-test-coverage --test-coverage-functions=80 --test src/lib/llm/*.check.ts && tsc --noEmit"
+    "check": "next typegen && node --experimental-test-coverage --test-coverage-functions=80 --test src/lib/**/*.check.ts && tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
