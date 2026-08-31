@@ -1,5 +1,8 @@
 node_modules/
 
+# build artifacts (gerado por `npm run build`)
+dist/
+
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
