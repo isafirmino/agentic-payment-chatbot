@@ -3,19 +3,32 @@ import express from 'express'
 import { z } from 'zod'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
-import { resolveCpf, resolveJwtSecret, Unauthorized } from './auth.ts'
+import { CONVERSA_HEADER, resolveConversaId, resolveCpf, resolveJwtSecret, Unauthorized } from './auth.ts'
 import { getDb } from './db.ts'
 import { bootstrapSchema, seedProducts } from './schema.ts'
 import { listarCatalogo, realizarCompra, registrarIntencao } from './tools.ts'
 
 const PORT = Number(process.env.PORT ?? 4000)
 const JWT_SECRET = resolveJwtSecret()
-const requestIdentity = new AsyncLocalStorage<{ cpf: string }>()
+const requestIdentity = new AsyncLocalStorage<{ cpf: string; conversaId?: string }>()
 
 function currentCpf(): string {
   const identity = requestIdentity.getStore()
   if (!identity) throw new Error('missing authenticated request context')
   return identity.cpf
+}
+
+/**
+ * Exigido pelas tools que criam ou consomem intenção. Lança quando o cabeçalho
+ * não veio: sem conversa não há como amarrar a intenção, e aceitar a chamada
+ * transformaria a proteção em opcional — bastaria omitir o cabeçalho. Ver
+ * ADR 0007.
+ */
+function currentConversaId(): string {
+  const identity = requestIdentity.getStore()
+  if (!identity) throw new Error('missing authenticated request context')
+  if (!identity.conversaId) throw new Unauthorized('missing conversation id')
+  return identity.conversaId
 }
 
 function json(value: unknown) {
@@ -45,7 +58,7 @@ mcp.registerTool(
     },
   },
   async ({ produto_id, quantidade }) =>
-    json(registrarIntencao(getDb(), currentCpf(), { produto_id, quantidade })),
+    json(registrarIntencao(getDb(), currentCpf(), currentConversaId(), { produto_id, quantidade })),
 )
 
 mcp.registerTool(
@@ -58,7 +71,7 @@ mcp.registerTool(
     },
   },
   async ({ intencao_id, metodo_pagamento }) =>
-    json(realizarCompra(getDb(), currentCpf(), { intencao_id, metodo_pagamento })),
+    json(realizarCompra(getDb(), currentCpf(), currentConversaId(), { intencao_id, metodo_pagamento })),
 )
 
 const app = express()
@@ -66,8 +79,13 @@ app.use(express.json())
 
 app.post('/mcp', async (req, res) => {
   let cpf: string
+  let conversaId: string | undefined
   try {
     cpf = resolveCpf(req.headers.authorization, JWT_SECRET)
+    // Ausente é permitido aqui: o catálogo não exige conversa. Quem exige são
+    // as tools de intenção, via currentConversaId(). Malformado, ao contrário,
+    // é recusado já — cabeçalho inválido é erro do cliente, não omissão.
+    conversaId = resolveConversaId(req.headers[CONVERSA_HEADER])
   } catch (error) {
     if (error instanceof Unauthorized) return res.status(401).json({ error: 'unauthorized' })
     throw error
@@ -76,7 +94,7 @@ app.post('/mcp', async (req, res) => {
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
   res.on('close', () => transport.close())
   await mcp.connect(transport)
-  await requestIdentity.run({ cpf }, () => transport.handleRequest(req, res, req.body))
+  await requestIdentity.run({ cpf, conversaId }, () => transport.handleRequest(req, res, req.body))
 })
 
 const db = getDb()

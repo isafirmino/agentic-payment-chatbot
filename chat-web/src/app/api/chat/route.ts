@@ -14,11 +14,16 @@ import {
 const HOLD_MS = 600
 const MAX_ROUNDS = 4
 
-async function connect(authHeader: string) {
+async function connect(authHeader: string, conversaId: string) {
   const mcpUrl = process.env.MCP_URL ?? 'http://localhost:4000/mcp'
   const client = new Client({ name: 'chat-web', version: '1.0.0' })
   const opts: ConstructorParameters<typeof StreamableHTTPClientTransport>[1] = {
-    requestInit: { headers: { Authorization: authHeader } },
+    // O identificador de conversa vai por cabeçalho, nunca como argumento de
+    // tool: se fosse argumento, o modelo poderia informá-lo, e uma trava que o
+    // próprio modelo preenche não é trava. Ver ADR 0007.
+    requestInit: {
+      headers: { Authorization: authHeader, 'X-Conversa-Id': conversaId },
+    },
   }
   await client.connect(new StreamableHTTPClientTransport(new URL(mcpUrl), opts))
   return client
@@ -37,8 +42,8 @@ function toProviderTools(
   }))
 }
 
-async function connectWithTools(authHeader: string) {
-  const client = await connect(authHeader)
+async function connectWithTools(authHeader: string, conversaId: string) {
+  const client = await connect(authHeader, conversaId)
   try {
     const tools = toProviderTools((await client.listTools()).tools)
     return { client, tools }
@@ -92,9 +97,23 @@ export async function POST(request: Request) {
     )
   }
 
+  // Sem identificador de conversa não dá pra registrar nem pagar intenção, e o
+  // servidor MCP recusaria de qualquer jeito. Recusar aqui devolve um erro
+  // claro em vez de deixar o agente esbarrar no 401 no meio de um turno.
+  const conversaId =
+    typeof body === 'object' && body !== null && 'conversaId' in body
+      ? body.conversaId
+      : undefined
+  if (typeof conversaId !== 'string' || !conversaId.trim()) {
+    return Response.json(
+      { error: 'conversaId must be a non-empty string' },
+      { status: 400 },
+    )
+  }
+
   let connection: Awaited<ReturnType<typeof connectWithTools>>
   try {
-    connection = await connectWithTools(authHeader)
+    connection = await connectWithTools(authHeader, conversaId)
   } catch (err) {
     const failure = classifyMcpConnectionFailure(
       err instanceof StreamableHTTPError ? err.code : undefined,

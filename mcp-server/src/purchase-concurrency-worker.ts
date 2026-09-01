@@ -6,10 +6,11 @@ type PurchaseWorkerData = {
   databasePath: string
   ownerCpf: string
   intentionId: string
+  conversaId: string
   now: string
 }
 
-const { databasePath, ownerCpf, intentionId, now } = workerData as PurchaseWorkerData
+const { databasePath, ownerCpf, intentionId, conversaId, now } = workerData as PurchaseWorkerData
 const db = new DatabaseSync(databasePath)
 db.exec('PRAGMA busy_timeout = 5000')
 db.exec('PRAGMA foreign_keys = ON')
@@ -18,6 +19,7 @@ try {
   const result = realizarCompra(
     db,
     ownerCpf,
+    conversaId,
     { intencao_id: intentionId, metodo_pagamento: 'pix' },
     new Date(now),
   )

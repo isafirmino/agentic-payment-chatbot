@@ -152,3 +152,20 @@ O teste concorrente também passa a configurar `busy_timeout = 5000` na conexão
 final de verificação. Sem essa espera, o processo pai podia abrir a conexão
 enquanto um worker ainda fechava o WAL, causando `database is locked` de forma
 intermitente.
+
+## Emenda — 2026-09-01 (vínculo com a conversa)
+
+O item de "Fora de escopo" — *"Vincular intenções a uma sessão ou comprovar no
+MCP que o identificador apareceu no histórico da conversa"* — **foi resolvido**
+pela `specs/008-conversation-bound-intent/`, e não vale mais como limitação
+desta feature.
+
+`realizar_compra` passou a buscar a intenção por `id`, `owner_cpf` **e**
+`conversa_id`, na mesma consulta. Uma intenção registrada em outra conversa, ou
+gravada antes daquela mudança (`conversa_id` nulo), recebe `INTENCAO_INVALIDA`
+— o mesmo código de um identificador inexistente, para não revelar que ele
+existe.
+
+As assinaturas de `registrarIntencao` e `realizarCompra` ganharam o parâmetro
+`conversaId` entre o CPF e os argumentos da tool. A decisão e as alternativas
+descartadas estão no [ADR 0007](../../docs/adr/0007-intencao-vinculada-a-conversa.md).
