@@ -89,7 +89,48 @@ O serviço reaproveita o SQLite compartilhado da task #6, configurado por
 - `produtos`, com valores monetários em centavos;
 - `intencoes`, com produto, quantidade, total, CPF e expiração;
 - `transacoes`, com uma compra aprovada por `intencao_id` e os dados usados no
-  cálculo acumulado do limite.
+  cálculo acumulado do limite;
+- `chamadas_tool`, a trilha de auditoria de toda chamada que chega a executar.
+
+### Log auditável
+
+`chamadas_tool` registra tool, CPF, argumentos, resultado, desfecho e instante
+de **toda** chamada — inclusive as recusadas, que é o que a distingue de
+`transacoes`. O desfecho é o rótulo curto do que aconteceu: `consultado` no
+catálogo, `pendente` numa intenção registrada, `aprovado` numa compra, ou o
+código de erro numa recusa.
+
+```bash
+node scripts/consultar-chamadas.mjs [cpf] [tool]
+```
+
+O registro acontece num envelope em volta das tools, **depois** de elas
+retornarem e **fora** da transação da compra — de propósito: uma recusa faz
+`ROLLBACK` de tudo, e um registro gravado por dentro sumiria junto com a
+tentativa que ele deveria documentar.
+
+Duas fronteiras, ambas deliberadas e detalhadas no
+[ADR 0008](../docs/adr/0008-log-auditavel-de-chamadas-de-tool.md):
+chamadas barradas pela validação de schema ou pela autenticação **não** entram
+no log, porque não chegaram a executar; e uma falha ao gravar o log **não**
+derruba a chamada, porque quando o envelope roda a compra já foi confirmada —
+a falha vai para a saída de erro do processo e a tool devolve seu resultado
+normalmente. Existe, portanto, uma janela em que a compra acontece e o registro
+não é gravado; a alternativa seria perder a compra por causa da auditoria.
+
+Três propriedades que valem saber antes de usar a tabela:
+
+- **É histórico permanente, não temporário.** Não há retenção: nada remove
+  registros, nem por idade, nem por volume, nem quando o usuário é removido.
+  A tabela cresce indefinidamente. Num uso local isso não é problema; num uso
+  prolongado, definir retenção é uma decisão pendente.
+- **Não referencia `usuarios`.** De propósito: o log precisa sobreviver à
+  remoção de um usuário, e uma chamada de um CPF que não existe é justamente um
+  dos casos a auditar.
+- **Não é registro comercial.** `transacoes` é a fonte de verdade sobre dinheiro
+  movido e é ela que o cálculo do limite consulta. Uma linha aqui com desfecho
+  `aprovado` documenta que a chamada aconteceu — não deve ser somada num
+  relatório financeiro.
 
 O seed insere os cinco produtos oficiais com `INSERT OR IGNORE`, preservando
 estoque e registros existentes. Inserção da transação, decremento do estoque e

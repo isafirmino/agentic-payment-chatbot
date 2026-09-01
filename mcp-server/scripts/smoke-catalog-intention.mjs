@@ -35,6 +35,7 @@ function cleanupSmokeData(db) {
     }
     db.prepare(`DELETE FROM transacoes WHERE owner_cpf = ?`).run(CPF)
     db.prepare(`DELETE FROM intencoes WHERE owner_cpf = ?`).run(CPF)
+    db.prepare(`DELETE FROM chamadas_tool WHERE owner_cpf = ?`).run(CPF)
     db.prepare(`DELETE FROM usuarios WHERE cpf = ?`).run(CPF)
     db.exec('COMMIT')
   } catch (error) {
@@ -168,8 +169,36 @@ async function main() {
       await transporteSemConversa.close()
     }
 
+    // O envelope de auditoria vive no server.ts, entre o protocolo e as tools.
+    // Os testes de unidade chamam as funções direto, então nunca passam por
+    // ele: sem esta conferência, remover o envelope não quebraria nada.
+    const registradas = db
+      .prepare(`SELECT tool, desfecho FROM chamadas_tool WHERE owner_cpf = ? ORDER BY id`)
+      .all(CPF)
+
+    assert(registradas.length >= 4, `log deveria ter as chamadas desta sessão, tem ${registradas.length}`)
+    assert(
+      registradas.some((c) => c.tool === 'listar_catalogo' && c.desfecho === 'consultado'),
+      'catálogo não foi registrado',
+    )
+    assert(
+      registradas.some((c) => c.tool === 'realizar_compra' && c.desfecho === 'aprovado'),
+      'compra aprovada não foi registrada',
+    )
+    // A recusa é o que distingue este log da tabela transacoes.
+    assert(
+      registradas.some((c) => c.tool === 'registrar_intencao' && c.desfecho === 'ESTOQUE_INSUFICIENTE'),
+      'recusa por estoque não foi registrada',
+    )
+    // Chamada barrada pelo schema não chega ao envelope, por decisão registrada
+    // no ADR 0008 — ela não executou nada.
+    assert(
+      !registradas.some((c) => c.desfecho === 'desconhecido'),
+      'chamada barrada pelo schema não deveria aparecer no log',
+    )
+
     console.log(
-      '✔ Smoke test OK — auth, conversation, discovery, catalog, intention, purchase and schemas passed.',
+      '✔ Smoke test OK — auth, conversation, discovery, catalog, intention, purchase, schemas and audit passed.',
     )
   } finally {
     await transport?.close()
