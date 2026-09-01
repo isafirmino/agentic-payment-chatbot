@@ -3,14 +3,36 @@ import { DatabaseSync } from 'node:sqlite'
 import { test } from 'node:test'
 import { bootstrapSchema, PRODUCTS, seedProducts } from './schema.ts'
 
-test('bootstrapSchema cria produtos, intencoes e transacoes de forma idempotente', () => {
+test('bootstrapSchema cria as quatro tabelas de forma idempotente', () => {
   const db = new DatabaseSync(':memory:')
   db.exec('PRAGMA foreign_keys = ON')
   bootstrapSchema(db)
   bootstrapSchema(db)
 
   const tables = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name`).all() as Array<{ name: string }>
-  assert.deepEqual(tables.map(({ name }) => name), ['intencoes', 'produtos', 'transacoes'])
+  assert.deepEqual(tables.map(({ name }) => name), [
+    'chamadas_tool',
+    'intencoes',
+    'produtos',
+    'transacoes',
+  ])
+})
+
+test('chamadas_tool nao referencia usuarios, para sobreviver a remocao do usuario', () => {
+  const db = new DatabaseSync(':memory:')
+  db.exec('PRAGMA foreign_keys = ON')
+  bootstrapSchema(db)
+
+  const chaves = db.prepare(`PRAGMA foreign_key_list('chamadas_tool')`).all()
+  assert.equal(chaves.length, 0)
+
+  // Uma chamada de um CPF que não existe em usuarios é justamente um dos casos
+  // a auditar, então precisa poder ser gravada.
+  db.prepare(
+    `INSERT INTO chamadas_tool (tool, owner_cpf, argumentos, resultado, desfecho, data)
+     VALUES ('realizar_compra', 'cpf_inexistente', '{}', '{}', 'INTENCAO_INVALIDA', '2026-01-01T00:00:00.000Z')`,
+  ).run()
+  assert.equal((db.prepare(`SELECT COUNT(*) AS n FROM chamadas_tool`).get() as { n: number }).n, 1)
 })
 test('transacoes referencia intencoes e impede pagamento duplicado', () => {
   const db = new DatabaseSync(':memory:')
