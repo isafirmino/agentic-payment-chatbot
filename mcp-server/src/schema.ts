@@ -29,6 +29,15 @@ export function bootstrapSchema(db: DatabaseSync): void {
       criada_em TEXT NOT NULL,
       expira_em TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS transacoes (
+      id TEXT PRIMARY KEY,
+      intencao_id TEXT NOT NULL UNIQUE REFERENCES intencoes(id),
+      valor_cents INTEGER NOT NULL CHECK (valor_cents >= 0),
+      metodo_pagamento TEXT NOT NULL CHECK (metodo_pagamento IN ('cartao', 'pix')),
+      owner_cpf TEXT NOT NULL,
+      data TEXT NOT NULL
+    );
   `)
 }
 export function seedProducts(db: DatabaseSync): void {
