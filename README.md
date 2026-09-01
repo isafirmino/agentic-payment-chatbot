@@ -178,9 +178,23 @@ node scripts/consultar-chamadas.mjs [cpf] [tool]
 
 O registro é feito **fora** da transação da compra, de propósito: uma recusa faz
 `ROLLBACK` de tudo o que tocou, e um log gravado por dentro sumiria junto com a
-tentativa que ele deveria documentar. As fronteiras da trilha — o que entra, o
-que não entra e por quê — estão no
-[ADR 0008](docs/adr/0008-log-auditavel-de-chamadas-de-tool.md).
+tentativa que ele deveria documentar.
+
+Três coisas a saber antes de confiar nessa tabela, todas deliberadas e
+detalhadas no [ADR 0008](docs/adr/0008-log-auditavel-de-chamadas-de-tool.md):
+
+- **É histórico permanente, não temporário.** Não existe política de retenção:
+  nada remove registros, e a tabela cresce indefinidamente. Apagar trilha de
+  auditoria automaticamente contraria o propósito dela; num uso prolongado,
+  definir retenção é uma decisão pendente, de negócio.
+- **Uma falha ao gravar o log não derruba a chamada.** Quando o registro
+  acontece, a compra já foi confirmada ao usuário — derrubá-la transformaria um
+  problema de auditoria numa compra perdida. Existe, portanto, uma janela em
+  que a compra acontece e o registro falha; a falha vai para a saída de erro.
+- **Não é registro comercial.** `transacoes` é a fonte de verdade sobre dinheiro
+  movido, e é ela que o cálculo do limite consulta. Uma linha do log com
+  desfecho `aprovado` documenta que a chamada aconteceu — não deve ser somada
+  num relatório financeiro.
 
 ### Provar a recusa sem depender do modelo
 

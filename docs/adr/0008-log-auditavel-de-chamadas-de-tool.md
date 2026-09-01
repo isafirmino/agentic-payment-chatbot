@@ -33,6 +33,16 @@ Três consequências fazem parte da decisão:
 - **O resultado é gravado por inteiro nas tools de intenção e resumido no
   catálogo**, onde o corpo é sempre a mesma lista.
 
+- **A tabela não tem chave estrangeira para `usuarios`.** À primeira vista
+  parece inconsistência — as outras tabelas do schema referenciam o que
+  precisam. É deliberado, por duas razões: o log precisa **sobreviver à
+  remoção de um usuário**, senão apagar a conta apagaria a trilha do que ela
+  fez; e uma chamada pode vir de um CPF que não existe em `usuarios`, que é
+  justamente um dos casos a auditar — hoje ela recebe `INTENCAO_INVALIDA`, e
+  precisamos poder registrar que a tentativa existiu. Uma chave estrangeira
+  transformaria as duas situações em erro de escrita, e o log perderia
+  exatamente os eventos mais interessantes.
+
 ## Alternativas consideradas
 
 - **Gravar dentro da transação da compra** — seria atômico com o efeito, e é a
@@ -86,9 +96,20 @@ Três consequências fazem parte da decisão:
   gravaria a intenção de auditar *antes* do efeito e confirmaria depois — duas
   escritas, complexidade que este escopo não justifica.
 
-- **A tabela cresce indefinidamente.** Cada turno do chat gera de uma a três
-  chamadas. Num uso local não é problema; quem levar isso adiante precisa
-  decidir retenção.
+- **A tabela cresce indefinidamente, e o log é histórico permanente — não
+  temporário.** Cada turno do chat gera de uma a três chamadas, e nada as
+  remove: nem idade, nem volume, nem a remoção do usuário que as originou.
+  Quem levar isso adiante precisa decidir retenção deliberadamente, e essa
+  decisão tem de vir acompanhada de uma política de negócio sobre por quanto
+  tempo a trilha precisa existir — não de um limite escolhido por conveniência
+  de espaço.
+
+- **`chamadas_tool` não é registro comercial.** Ela documenta que uma chamada
+  aconteceu e o que o backend respondeu; `transacoes` é que registra dinheiro
+  movido. Uma linha no log com desfecho `aprovado` **não** é uma segunda fonte
+  de verdade sobre a compra: a fonte é `transacoes`, e é ela que o cálculo do
+  limite consulta. Confundir as duas levaria a somar valores do log num
+  relatório financeiro.
 
 - Chamadas barradas por schema não aparecem no log. Quem investigar um cliente
   que envia argumentos inválidos não encontrará rastro — pelo desenho, não por

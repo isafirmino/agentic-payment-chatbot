@@ -47,3 +47,10 @@
 - [x] `consultar-chamadas.mjs` sobre o banco da sessão
 - [x] `consultar-transacoes.mjs` e `verify-shared-db.mjs` seguem passando
 - [x] Rodar `pr-review` antes do PR
+
+## Correções da revisão da PR #26
+
+- [x] Registrar no ADR que a tabela não referencia `usuarios`, e por quê
+- [x] Documentar retenção nos dois READMEs, não só no ADR
+- [x] Deixar explícito que o log é histórico permanente, não temporário
+- [x] Distinguir o log de registro comercial, para não ser somado como receita
