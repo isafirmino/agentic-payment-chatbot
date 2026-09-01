@@ -158,3 +158,58 @@ o projeto, sem depender de nenhum cliente SQLite externo.
   vídeo da execução.
 - Traduzir a documentação. O repositório é escrito em português e a entrega
   segue a mesma língua.
+
+## Emenda — 2026-09-01
+
+### Provedor de LLM das evidências
+
+A spec assumia o Ollama local com `qwen2.5:7b`, conforme decidido antes da
+execução. As evidências foram geradas com **OpenRouter** (`openrouter/free`,
+que resolveu para `minimax/minimax-m3:free`). A troca não altera o ADR 0002 —
+Ollama continua primário e OpenRouter continua fallback; mudou apenas qual dos
+dois atendeu a sessão gravada.
+
+O motivo é que suportar tool calling não basta: o modelo precisa acertar os
+**argumentos**. Medindo pela aplicação real, com as tools descobertas no
+`mcp-server`:
+
+- `qwen2.5:7b` narrava "sua intenção foi registrada com sucesso" **sem chamar
+  ferramenta alguma**, com o banco vazio. É a pior falha possível aqui, porque
+  é convincente.
+- `llama3.1:8b` chamava a ferramenta certa com argumento inválido —
+  `{"produto_id":"Fone Bluetooth"}` em vez de `prod_001`, `quantidade` como
+  string, e `realizar_compra` sem `intencao_id`.
+
+Nenhum dos dois completou uma compra. O OpenRouter fechou o fluxo com
+linguagem natural, com id e tipos corretos em todas as chamadas.
+
+Uma lição de método ficou registrada aqui porque custou caro: medir apenas se
+o modelo chamou a **ferramenta certa** não diz nada — é preciso verificar os
+argumentos, e contra os schemas reais do MCP, não contra schemas reescritos
+para o teste.
+
+### Evidências: seis capturas, não sete
+
+O tier gratuito do OpenRouter limita a 50 requisições por dia, e a sessão
+esbarrou nisso na terceira cena de jailbreak. Foram capturadas seis imagens; a
+cena faltante é do extra opcional do desafio, e as duas anteriores já o
+cobrem.
+
+Além disso, nas capturas 4 a 6 o agente **recusou por conta própria**, sem
+chamar a ferramenta, obedecendo ao system prompt. É bom comportamento, mas
+demonstra o prompt, não a validação no servidor — e um modelo pode ser
+trocado.
+
+Por isso o README ganhou uma evidência que a spec original não previa: a
+chamada de `realizar_compra` **direto no MCP**, com o JWT do usuário e sem
+modelo no meio, cobrindo id inventado, id plausível, id vazio e id já pago.
+Ela prova a validação na camada que importa e não depende de convencer nenhum
+modelo a tentar algo proibido.
+
+### Correção de legibilidade fora desta feature
+
+O teste manual revelou que o painel de ferramentas cortava o fim do JSON,
+escondendo `limite_restante` e `mensagem`. Conforme o item de "Fora de escopo"
+desta spec, isso virou issue própria (#16) e PR separada, e não foi corrigido
+aqui. As capturas foram feitas com aquela correção aplicada, então a PR da #16
+deve mergear antes desta.

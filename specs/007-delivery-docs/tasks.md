@@ -28,19 +28,21 @@
 
 ## Execução e captura
 
-- [x] Instalar Ollama, baixar `qwen2.5:7b` e criar os três `.env`
+- [x] Configurar o provedor de LLM e criar os três `.env`
 - [x] Subir os três serviços e confirmar que respondem nas portas 3001, 4000 e 3000
-- [ ] Executar o roteiro completo, do cadastro à recusa por `intencao_id` inválido
-- [ ] Gravar `01-compra-aprovada-cartao.png` e `02-compra-aprovada-pix.png`
-- [ ] Gravar `03-limite-excedido.png` e `04-intencao-invalida.png`
-- [ ] Gravar as três capturas de jailbreak (`05`, `06`, `07`)
-- [ ] Conferir cada imagem: painel fixado, código de erro legível, sem dado sensível
+- [x] Executar o roteiro completo, do cadastro à recusa por `intencao_id` inválido
+- [x] Gravar `01-compra-aprovada-cartao.png` e `02-compra-aprovada-pix.png`
+- [x] Gravar `03-limite-excedido.png` e `04-intencao-invalida.png`
+- [x] Gravar as capturas de jailbreak `05` e `06` — a terceira esbarrou na cota
+      diária do OpenRouter; ver a emenda da spec
+- [x] Registrar a prova de validação direto no MCP, sem o modelo no meio
+- [x] Conferir cada imagem: painel fixado, código de erro legível, sem dado sensível
 
 ## Verificação
 
-- [ ] Rodar `npm run check` no `chat-web`
-- [ ] Rodar `node scripts/verify-shared-db.mjs`
-- [ ] Rodar `node scripts/consultar-transacoes.mjs` com o banco da sessão gravada
-- [ ] Conferir a tabela de conformidade linha a linha contra o `docs/desafio.md`
-- [ ] Confirmar que as imagens renderizam na pré-visualização do README
-- [ ] Rodar `pr-review` antes do PR
+- [x] Rodar `npm run check` no `chat-web`
+- [x] Rodar `node scripts/verify-shared-db.mjs`
+- [x] Rodar `node scripts/consultar-transacoes.mjs` com o banco da sessão gravada
+- [x] Conferir a tabela de conformidade linha a linha contra o `docs/desafio.md`
+- [x] Confirmar que as imagens renderizam na pré-visualização do README
+- [x] Rodar `pr-review` antes do PR
