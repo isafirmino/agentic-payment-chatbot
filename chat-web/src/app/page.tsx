@@ -3,42 +3,16 @@
 import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Markdown from "react-markdown";
-
-type Role = "system" | "user" | "assistant";
-type Message = { role: Role; content: string };
-type ToolRun = {
-  name: string;
-  arguments: Record<string, unknown>;
-  result: unknown;
-};
-type Turn = Message & { sent?: Message[]; tools?: ToolRun[] };
-type ChatId = "stateless" | "withHistory";
-
-const SYSTEM: Message = {
-  role: "system",
-  content:
-    "Você é um vendedor de uma loja de eletrônicos. Responda SEMPRE em português brasileiro, de forma objetiva e educada. Nunca escreva em inglês. " +
-    "Fale apenas sobre a loja: produtos, preços, disponibilidade e horário. Se perguntarem outra coisa, diga que só pode ajudar com a loja. " +
-    "Você tem ferramentas: use get_time para qualquer pergunta sobre data ou hora atual, e list_items para qualquer pergunta sobre o que está à venda ou quanto custa. " +
-    "Nunca invente produtos nem preços — chame a ferramenta. Mostre os preços em reais, no formato R$ 1.234,56.",
-};
-
-const CHATS: { id: ChatId; label: string }[] = [
-  { id: "stateless", label: "Sem memória (só a última mensagem)" },
-  { id: "withHistory", label: "Histórico completo" },
-];
+import { buildPayload, toHistory, type Turn } from "@/lib/chat/payload";
 
 export default function Page() {
   const router = useRouter();
   const [autenticado, setAutenticado] = useState(false);
-  const [chats, setChats] = useState<Record<ChatId, Turn[]>>({
-    stateless: [],
-    withHistory: [],
-  });
-  const [active, setActive] = useState<ChatId>("stateless");
+  const [messages, setMessages] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [peek, setPeek] = useState<number | null>(null);
+  const [pinned, setPinned] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
@@ -58,33 +32,32 @@ export default function Page() {
     return <div>Redirecionando...</div>;
   }
 
-  const messages = chats[active];
-
   function showPeek(i: number) {
     clearTimeout(closeTimer.current);
-    setPeek(i);
+    if (!pinned) setPeek(i);
   }
   function hidePeek() {
+    if (pinned) return;
     closeTimer.current = setTimeout(() => setPeek(null), 400);
   }
-
-  function setChat(id: ChatId, next: Turn[]) {
-    setChats((prev) => ({ ...prev, [id]: next }));
+  // Fixar existe pra dar pra capturar a tela do painel: no hover puro, o
+  // cursor precisa ficar parado em cima enquanto se aciona a captura.
+  function togglePin(i: number) {
+    clearTimeout(closeTimer.current);
+    const desfixar = pinned && peek === i;
+    setPinned(!desfixar);
+    setPeek(desfixar ? null : i);
   }
 
   async function send(e: { preventDefault(): void }) {
     e.preventDefault();
     if (!input.trim() || busy) return;
 
-    const id = active;
-    const user: Message = { role: "user", content: input };
-    const history = chats[id].map(({ role, content }) => ({ role, content }));
-    const payload: Message[] =
-      id === "withHistory" ? [SYSTEM, ...history, user] : [SYSTEM, user];
+    const payload = buildPayload(toHistory(messages), input);
+    const turn: Turn = { role: "user", content: input, sent: payload };
+    const next: Turn[] = [...messages, turn];
 
-    const turn: Turn = { ...user, sent: payload };
-    const next: Turn[] = [...chats[id], turn];
-    setChat(id, [...next, { role: "assistant", content: "" }]);
+    setMessages([...next, { role: "assistant", content: "" }]);
     setInput("");
     setBusy(true);
 
@@ -122,11 +95,11 @@ export default function Page() {
             reply = "";
           }
           reply += chunk.message?.content ?? "";
-          setChat(id, [...next, { role: "assistant", content: reply }]);
+          setMessages([...next, { role: "assistant", content: reply }]);
         }
       }
     } catch (err) {
-      setChat(id, [...next, { role: "assistant", content: `Erro: ${err}` }]);
+      setMessages([...next, { role: "assistant", content: `Erro: ${err}` }]);
     } finally {
       setBusy(false);
     }
@@ -134,31 +107,11 @@ export default function Page() {
 
   return (
     <main className="mx-auto flex h-screen max-w-2xl flex-col gap-4 p-4">
-      <div className="flex gap-2">
-        {CHATS.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => {
-              setActive(c.id);
-              setPeek(null);
-            }}
-            className={
-              c.id === active
-                ? "rounded bg-blue-600 px-3 py-2 text-sm text-white"
-                : "rounded border px-3 py-2 text-sm"
-            }
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
-
       <div className="flex-1 space-y-3 overflow-y-auto">
         {messages.length === 0 && (
           <p className="text-sm text-gray-500">
-            {active === "withHistory"
-              ? "Todas as mensagens anteriores vão junto em cada requisição."
-              : "Só a sua última mensagem é enviada — o modelo não vê histórico."}
+            Toda a conversa vai junto ao modelo em cada mensagem. Clique numa
+            mensagem sua para fixar o painel com o que foi enviado.
           </p>
         )}
         {messages.map((m, i) =>
@@ -167,7 +120,9 @@ export default function Page() {
               key={i}
               onMouseEnter={() => showPeek(i)}
               onMouseLeave={hidePeek}
-              className="ml-auto w-fit max-w-[80%] cursor-help whitespace-pre-wrap rounded bg-blue-600 px-3 py-2 text-white"
+              onClick={() => togglePin(i)}
+              title="Ver o que foi enviado ao modelo (clique para fixar)"
+              className="ml-auto w-fit max-w-[80%] cursor-pointer whitespace-pre-wrap rounded bg-blue-600 px-3 py-2 text-white"
             >
               {m.content}
             </div>
@@ -203,10 +158,21 @@ export default function Page() {
           onMouseLeave={hidePeek}
           className="fixed right-4 top-4 z-10 max-h-[calc(100vh-2rem)] w-80 overflow-y-auto rounded border border-gray-300 bg-white p-3 text-xs shadow-lg xl:w-96 dark:border-gray-700 dark:bg-gray-900"
         >
-          <p className="mb-2 font-semibold">
-            Enviado ao modelo ({messages[peek].sent.length}{" "}
-            {messages[peek].sent.length === 1 ? "mensagem" : "mensagens"})
-          </p>
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <p className="font-semibold">
+              Enviado ao modelo ({messages[peek].sent.length}{" "}
+              {messages[peek].sent.length === 1 ? "mensagem" : "mensagens"})
+            </p>
+            {pinned && (
+              <button
+                onClick={() => togglePin(peek)}
+                className="rounded border px-2 py-0.5 text-xs"
+                aria-label="Desafixar painel"
+              >
+                fixado ×
+              </button>
+            )}
+          </div>
           {messages[peek].tools?.map((t, j) => (
             <div
               key={`tool-${j}`}
