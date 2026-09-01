@@ -24,7 +24,7 @@
 - [x] Declarar provedor e modelo usados, referenciando o ADR 0002
 - [x] Montar a tabela de conformidade com o checklist do `docs/desafio.md`
 - [x] Documentar a tabela `transacoes` como log auditável e o script de consulta
-- [x] Embutir as sete evidências com legenda explicando o que cada uma prova
+- [x] Embutir as evidências com legenda explicando o que cada uma prova
 
 ## Execução e captura
 
@@ -46,3 +46,13 @@
 - [x] Conferir a tabela de conformidade linha a linha contra o `docs/desafio.md`
 - [x] Confirmar que as imagens renderizam na pré-visualização do README
 - [x] Rodar `pr-review` antes do PR
+
+## Correções da revisão da PR #19
+
+- [x] Tornar a prova de recusa reproduzível em `scripts/verificar-recusas.mjs`
+- [x] Abrir o banco em modo somente leitura no script de auditoria
+- [x] Declarar conformidade parcial nas três linhas em que ela é parcial
+- [x] Abrir issues #20, #21 e #22 para as lacunas de escopo
+- [x] Corrigir a estimativa de requisições por turno do OpenRouter
+- [x] Registrar na emenda que as capturas 05 e 06 são de uma segunda conversa
+- [x] Alinhar contagem de capturas e referências cruzadas entre spec, plano, tasks e README

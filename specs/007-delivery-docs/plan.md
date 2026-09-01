@@ -25,6 +25,21 @@
   corrigido em `verify-shared-db.mjs`.
 - Fechar a conexão em `finally`.
 
+## 1b. Script de verificação das recusas
+
+- Criar `scripts/verificar-recusas.mjs`, no mesmo estilo dos outros scripts da
+  pasta: ESM avulso, executado com `node` puro a partir da raiz.
+- Autenticar no `api-auth` com CPF e senha passados por argumento, para obter um
+  JWT real em vez de assinar um por fora.
+- Conectar no `mcp-server` pelo SDK instalado em `chat-web/node_modules`, como o
+  `verify-shared-db.mjs` faz ao importar os `db.ts` dos serviços.
+- Chamar `realizar_compra` com identificadores inválidos — inventado, plausível,
+  vazio, método fora do contrato e, opcionalmente, uma intenção já paga — e
+  comparar cada retorno com o código de erro esperado.
+- Sair com `process.exitCode = 1` se algum caso não recusar como esperado, para
+  que sirva em CI. Nunca `process.exit()`, que pularia o `finally` que fecha a
+  conexão MCP.
+
 ## 2. Comentário no `.env.example` do `chat-web`
 
 - Manter `OLLAMA_MODEL=qwen2.5:14b` como valor.
@@ -67,7 +82,7 @@
   captura que o comprova.
 - Documentar o log auditável: o que a tabela `transacoes` guarda e como rodar o
   script de consulta.
-- Seção de evidências ao final, com as sete imagens embutidas por caminho
+- Seção de evidências ao final, com as seis imagens embutidas por caminho
   relativo e uma legenda por imagem explicando o que ela prova.
 - Linkar `docs/teste-manual.md`, `docs/architecture.md`, `docs/desafio.md`, os
   READMEs dos três serviços e o índice de ADRs.
@@ -76,7 +91,7 @@
 
 - Instalar o Ollama, baixar `qwen2.5:7b` e criar os três `.env`.
 - Subir `api-auth` (3001), `mcp-server` (4000) e `chat-web` (3000).
-- Executar o roteiro inteiro e gravar as sete capturas em `docs/screenshots/`,
+- Executar o roteiro inteiro e gravar as capturas em `docs/screenshots/`,
   com os nomes definidos no roteiro.
 - Conferir cada imagem antes de commitar: painel de ferramentas visível, código
   de erro legível nas recusas, e nenhum dado sensível na tela.

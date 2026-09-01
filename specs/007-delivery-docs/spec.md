@@ -213,3 +213,61 @@ escondendo `limite_restante` e `mensagem`. Conforme o item de "Fora de escopo"
 desta spec, isso virou issue própria (#16) e PR separada, e não foi corrigido
 aqui. As capturas foram feitas com aquela correção aplicada, então a PR da #16
 deve mergear antes desta.
+
+## Emenda — 2026-09-01 (revisão da PR #19)
+
+A revisão apontou pontos que a emenda anterior não cobria. Todos foram
+verificados no código antes de aceitos.
+
+### As capturas 05 e 06 são de uma segunda conversa
+
+As capturas 01 a 04 vêm de uma sessão contínua — o contador do painel cresce de
+10 para 30 mensagens. As de jailbreak (05 e 06) vêm de **outra conversa**,
+iniciada depois de recarregar a página: o contador reinicia em 14, e a intenção
+usada é diferente (Cadeira Gamer com quantidade 2).
+
+A spec original descrevia "uma única sessão de chat". Na prática foram duas,
+sobre o mesmo banco e o mesmo usuário. Isso não invalida nenhuma evidência — os
+saldos e transações são contínuos, e o log auditável do fim confere com as duas
+compras aprovadas —, mas está registrado aqui em vez de recapturado, porque
+recapturar exigiria gastar de novo a cota diária do provedor sem ganho de prova.
+
+### Conformidade parcial declarada explicitamente
+
+A tabela de conformidade do README dizia "cumprido" em três linhas que são
+**parciais**. Corrigido, com issue para cada uma:
+
+- **Contrato das tools** (issue #20) — `quantidade` é anunciada como
+  `z.number()` e `metodo_pagamento` como `z.string()`, mais frouxo que o
+  contrato do desafio. O backend valida as duas regras antes de qualquer
+  efeito, mas o modelo recebe um schema mais permissivo do que deveria.
+- **Vínculo da intenção com a conversa** (issue #21) — o `docs/desafio.md:124`
+  exige que a intenção tenha aparecido no histórico da conversa. A intenção é
+  gravada só com `owner_cpf`, então uma intenção pendente criada noutra aba
+  pelo mesmo usuário seria aceita. Já estava fora de escopo na task #8.
+- **Log auditável** (issue #22) — o extra pede log de *cada chamada de tool*; a
+  tabela `transacoes` registra somente compras aprovadas.
+
+Nenhuma das três é defeito de segurança: o backend valida tudo o que precisa
+antes de mover dinheiro. São lacunas de escopo, e declarar "cumprido" sem
+ressalva seria enganoso para quem avalia.
+
+### A prova da validação virou script executável
+
+A emenda anterior acrescentou a chamada direta ao MCP como evidência, mas
+apenas como transcript colado no README — não reproduzível. Agora é
+`scripts/verificar-recusas.mjs`, que autentica no `api-auth`, chama
+`realizar_compra` no MCP com cinco identificadores inválidos, compara cada
+retorno com o código de erro esperado e sai com status diferente de zero se
+algum divergir.
+
+### Correções menores
+
+- `scripts/consultar-transacoes.mjs` passa a abrir o banco com
+  `{ readOnly: true }`, como o `plan.md` já pedia.
+- A estimativa de consumo do OpenRouter estava errada: um turno do chat não
+  equivale a uma requisição. O backend chama o modelo, executa a ferramenta e
+  chama de novo com o resultado, em até quatro rodadas por turno. Corrigido no
+  README, no roteiro e no `.env.example`.
+- Referências cruzadas e a contagem de capturas (seis, não sete) alinhadas
+  entre `spec.md`, `plan.md`, `tasks.md` e README.

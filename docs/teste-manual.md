@@ -41,9 +41,12 @@ caminho recomendado para reproduzir o roteiro: não exige GPU nem download.
 
 3. Não suba o Ollama. Sem ele acessível, o fallback entra sozinho.
 
-> **Limite do tier gratuito: 50 requisições por dia.** Cada turno do chat
-> consome uma, e o roteiro completo gasta cerca de 12. Se estourar, o chat
-> responde com um erro `429` e o reset é diário.
+> **Limite do tier gratuito: 50 requisições por dia.** Um turno do chat consome
+> **mais de uma**: o backend chama o modelo, executa a ferramenta pedida e
+> chama de novo com o resultado, em até quatro rodadas por turno. Um turno que
+> registra intenção e paga gasta de 2 a 3 requisições, e o roteiro completo
+> fica perto de 30. Se estourar, o chat responde com erro `429`; o reset é
+> diário.
 
 #### Se preferir usar Ollama
 

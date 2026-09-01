@@ -87,7 +87,9 @@ try {
     )
   }
 
-  db = new DatabaseSync(caminho)
+  // readOnly porque isto é auditoria: um relatório não deve ser capaz de
+  // alterar aquilo que audita, nem mesmo por engano.
+  db = new DatabaseSync(caminho, { readOnly: true })
   db.exec('PRAGMA busy_timeout = 5000')
 
   exigirTabela(db, 'usuarios', 'Suba o api-auth ao menos uma vez (ele cria essa tabela).')

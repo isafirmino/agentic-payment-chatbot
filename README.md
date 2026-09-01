@@ -47,8 +47,11 @@ vez de `prod_001`. O [`chat-web/.env.example`](chat-web/.env.example) registra
 os detalhes, e o [roteiro de teste](docs/teste-manual.md) mostra como verificar
 antes de confiar.
 
-> O tier gratuito do OpenRouter permite **50 requisições por dia**, e cada
-> turno do chat consome uma.
+> O tier gratuito do OpenRouter permite **50 requisições por dia**, e um turno
+> do chat consome **mais de uma**: o backend chama o modelo, executa a
+> ferramenta pedida e chama de novo com o resultado, em até quatro rodadas por
+> turno. Um turno que registra intenção e paga consome de 2 a 3 requisições.
+> A sessão completa deste roteiro gasta perto de 30.
 
 ---
 
@@ -148,34 +151,54 @@ Jose Carlos  (CPF 11122233344)
 ```
 
 O saldo é calculado com a mesma expressão do backend — `limite_cents` menos a
-soma de `valor_cents` do CPF —, e não com uma segunda implementação da regra.
+soma de `valor_cents` do CPF —, e não com uma segunda implementação da regra. O
+banco é aberto em modo somente leitura: um relatório não deve poder alterar
+aquilo que audita.
+
+A tabela guarda apenas compras **aprovadas**. Chamadas de catálogo, registros
+de intenção e compras recusadas não são gravadas — ver
+[issue #22](https://github.com/isafirmino/agentic-payment-chatbot/issues/22).
+
+Para verificar as recusas, existe um script separado que chama o MCP direto:
+
+```bash
+node scripts/verificar-recusas.mjs <cpf> <senha> [intencao_ja_paga]
+```
+
+Ele confere que identificadores de intenção inválidos são recusados pelo
+backend, e sai com status diferente de zero se algum não for. Saída completa na
+[evidência 7](#7-a-validação-no-backend-sem-o-modelo-no-meio).
 
 ---
 
 ## Critérios de conclusão
 
 Cada linha do checklist do [desafio](docs/desafio.md), com onde ela está
-cumprida.
+cumprida — e, onde a cobertura é **parcial**, o que falta e por quê.
 
-| Critério | Onde está | Evidência |
+| Critério | Situação | Onde está | Evidência |
+|---|---|---|---|
+| Frontend e backend rodando localmente | ✅ | `chat-web`, `api-auth`, `mcp-server` | [Como rodar](#como-rodar) |
+| Login funcionando; chat inacessível sem autenticação | ✅ | `api-auth` (JWT HS256, senha com scrypt); `chat-web` redireciona para `/login` sem sessão | [ADR 0004](docs/adr/0004-authentication-jwt-cpf.md) |
+| Servidor MCP com as 3 tools expostas e descobertas pelo agente | ✅ | `mcp-server` via Streamable HTTP | Painel de ferramentas em todas as capturas |
+| Tools respeitam os contratos de argumentos e retorno | ⚠️ **parcial** | Retornos conferem; os *schemas anunciados* são mais frouxos que o contrato — `quantidade` é `z.number()` em vez de inteiro positivo, `metodo_pagamento` é `z.string()` em vez de `cartao \| pix`. O backend valida as duas regras antes de qualquer efeito, mas o modelo recebe um contrato mais permissivo do que deveria | [issue #20](https://github.com/isafirmino/agentic-payment-chatbot/issues/20) |
+| Compra concluída com `cartao` **e** com `pix` | ✅ | `realizar_compra` | 📸 1 e 2 |
+| `realizar_compra` exige `intencao_id` válido e recusa id inventado | ⚠️ **parcial** | Id inexistente, vazio ou de outro CPF é recusado. Mas o desafio pede vínculo com a **sessão/conversa atual**, e a intenção é gravada só com `owner_cpf` — uma intenção pendente criada noutra aba pelo mesmo usuário seria aceita. Ficou fora de escopo na task #8 (`specs/006-purchase-payment/spec.md`) | 📸 4 · `scripts/verificar-recusas.mjs` · [issue #21](https://github.com/isafirmino/agentic-payment-chatbot/issues/21) |
+| Tentativa acima do limite retorna erro | ✅ | `LIMITE_EXCEDIDO` antes de qualquer efeito | 📸 3 |
+| Limite armazenado e validado no backend | ✅ | `usuarios.limite_cents` no SQLite; recalculado a cada compra | [ADR 0006](docs/adr/0006-compra-atomica-e-limite-acumulado.md) · 📸 3 |
+| Histórico completo enviado ao modelo a cada turno | ✅ | `chat-web/src/lib/chat/payload.ts`, incluindo chamadas de tool e resultados | Painel "Enviado ao modelo" em todas as capturas |
+| `README.md` com instruções de execução e qual modelo foi usado | ✅ | Este arquivo | [Modelo de linguagem](#modelo-de-linguagem) |
+
+**Extras opcionais:**
+
+| Extra | Situação | Onde está |
 |---|---|---|
-| Frontend e backend rodando localmente | `chat-web`, `api-auth`, `mcp-server` | [Como rodar](#como-rodar) |
-| Login funcionando; chat inacessível sem autenticação | `api-auth` (JWT HS256, senha com scrypt); `chat-web` redireciona para `/login` sem sessão | [ADR 0004](docs/adr/0004-authentication-jwt-cpf.md) |
-| Servidor MCP com as 3 tools expostas e descobertas pelo agente | `mcp-server` via Streamable HTTP | Painel de ferramentas em todas as capturas |
-| Tools respeitam os contratos de argumentos e retorno | `mcp-server/src/tools.ts` | [ADR 0005](docs/adr/0005-contrato-catalogo-e-intencao.md) · [ADR 0006](docs/adr/0006-compra-atomica-e-limite-acumulado.md) |
-| Compra concluída com `cartao` **e** com `pix` | `realizar_compra` | 📸 1 e 2 |
-| `realizar_compra` exige `intencao_id` válido e recusa id inventado | Intenção buscada por `id` **e** `owner_cpf` | 📸 4 (agente recusa) · evidência 7 (backend recusa) |
-| Tentativa acima do limite retorna erro | `LIMITE_EXCEDIDO` antes de qualquer efeito | 📸 3 |
-| Limite armazenado e validado no backend | `usuarios.limite_cents` no SQLite; recalculado a cada compra | [ADR 0006](docs/adr/0006-compra-atomica-e-limite-acumulado.md) · 📸 3 |
-| Histórico completo enviado ao modelo a cada turno | `chat-web/src/lib/chat/payload.ts`, incluindo chamadas de tool e resultados | Painel "Enviado ao modelo" em todas as capturas |
-| `README.md` com instruções de execução e qual modelo foi usado | Este arquivo | [Modelo de linguagem](#modelo-de-linguagem) |
+| Log auditável de **cada chamada de tool** | ⚠️ **parcial** | A tabela `transacoes` registra quem, quando, quanto e o resultado de cada compra **aprovada**. Chamadas de catálogo, registros de intenção e compras **recusadas** não são gravadas — só aparecem no painel do chat, que é volátil. Ver [issue #22](https://github.com/isafirmino/agentic-payment-chatbot/issues/22) |
+| Teste de jailbreak | ✅ | 📸 5 e 6 |
 
-**Extras opcionais**, ambos cumpridos:
-
-| Extra | Onde está |
-|---|---|
-| Log auditável de cada compra (quem, quando, quanto, resultado) | Tabela `transacoes` + `scripts/consultar-transacoes.mjs` |
-| Teste de jailbreak | 📸 5 e 6 |
+As três lacunas acima são de escopo, não defeitos: o backend valida tudo o que
+precisa antes de mover dinheiro. Estão registradas como issues para não se
+perderem numa tabela de conformidade que dissesse "cumprido" sem ressalva.
 
 ---
 
@@ -237,7 +260,7 @@ O usuário insiste que o id correto é `int_falsa123`. O agente **recusa sem
 sequer chamar a ferramenta**, explicando que só pode usar intenções registradas
 na própria conversa e que a regra é verificada pelo sistema.
 
-A validação do backend para o mesmo caso está na evidência 6, que não depende
+A validação do backend para o mesmo caso está na evidência 7, que não depende
 de convencer o modelo a tentar.
 
 ### 5. Jailbreak — ignorar o limite
@@ -271,30 +294,53 @@ nem autorização** —, o CPF vem do JWT e o valor cobrado vem sempre de
 ### 7. A validação no backend, sem o modelo no meio
 
 As evidências 4 a 6 mostram o agente segurando os pedidos. Isso é bom
-comportamento, mas depende do modelo — e um modelo pode ser trocado. A
-verificação abaixo chama `realizar_compra` direto no servidor MCP, com o JWT do
-usuário, sem nenhum modelo participando:
+comportamento, mas depende do modelo — e modelo se troca. A verificação abaixo
+chama `realizar_compra` direto no servidor MCP, com o JWT do usuário, sem
+nenhum modelo participando. **É executável**, não um transcript:
 
-```
-realizar_compra {"intencao_id":"int_falsa123","metodo_pagamento":"pix"}
-  -> {"status":"recusado","erro":"INTENCAO_INVALIDA",
-      "mensagem":"Intenção inválida para o usuário autenticado."}
-
-realizar_compra {"intencao_id":"int_aprovada","metodo_pagamento":"cartao"}
-  -> {"status":"recusado","erro":"INTENCAO_INVALIDA", ...}
-
-realizar_compra {"intencao_id":"","metodo_pagamento":"pix"}
-  -> {"status":"recusado","erro":"INTENCAO_INVALIDA", ...}
-
-realizar_compra {"intencao_id":"int_a04132","metodo_pagamento":"pix"}
-  -> {"status":"recusado","erro":"INTENCAO_JA_PAGA",
-      "mensagem":"Esta intenção de compra já foi utilizada."}
+```bash
+node scripts/verificar-recusas.mjs 11122233344 senha123 int_a04132
 ```
 
-O último usa `int_a04132`, a intenção real da compra aprovada na evidência 1, e
-demonstra a defesa contra cobrança dupla. A intenção é buscada por `id` **e**
-`owner_cpf`, então id inexistente, id de outro usuário e id já pago caem todos
-numa recusa estruturada — nunca numa exceção.
+```
+Autenticado como Jose Carlos (CPF 11122233344).
+O CPF vem do JWT — nunca dos argumentos da tool.
+
+✔ identificador inventado
+    realizar_compra {"intencao_id":"int_falsa123","metodo_pagamento":"pix"}
+    -> {"status":"recusado","erro":"INTENCAO_INVALIDA","mensagem":"Intenção inválida para o usuário autenticado."}
+
+✔ identificador plausível
+    realizar_compra {"intencao_id":"int_aprovada","metodo_pagamento":"cartao"}
+    -> {"status":"recusado","erro":"INTENCAO_INVALIDA","mensagem":"Intenção inválida para o usuário autenticado."}
+
+✔ identificador vazio
+    realizar_compra {"intencao_id":"","metodo_pagamento":"pix"}
+    -> {"status":"recusado","erro":"INTENCAO_INVALIDA","mensagem":"Intenção inválida para o usuário autenticado."}
+
+✔ método fora do contrato
+    realizar_compra {"intencao_id":"int_falsa123","metodo_pagamento":"boleto"}
+    -> {"status":"recusado","erro":"INTENCAO_INVALIDA","mensagem":"Intenção inválida para o usuário autenticado."}
+
+✔ intenção já paga
+    realizar_compra {"intencao_id":"int_a04132","metodo_pagamento":"pix"}
+    -> {"status":"recusado","erro":"INTENCAO_JA_PAGA","mensagem":"Esta intenção de compra já foi utilizada."}
+
+✔ Todos os 5 identificadores inválidos foram recusados pelo backend.
+```
+
+O script compara cada retorno com o código de erro esperado e sai com status
+diferente de zero se algum divergir — dá para rodar em CI.
+
+O último caso usa `int_a04132`, a intenção real da compra aprovada na
+evidência 1, e demonstra a defesa contra cobrança dupla. Todas as recusas são
+retorno estruturado, nunca exceção.
+
+> Uma ressalva honesta: essa verificação cobre id inexistente, vazio, de outro
+> usuário e já pago. Ela **não** cobre o vínculo com a conversa, que o desafio
+> também pede e que hoje não existe — ver a linha correspondente nos
+> [critérios de conclusão](#critérios-de-conclusão) e a
+> [issue #21](https://github.com/isafirmino/agentic-payment-chatbot/issues/21).
 
 ### 8. O log auditável ao final da sessão real
 
