@@ -220,16 +220,16 @@ backend, e sai com status diferente de zero se algum não for. Saída completa n
 ## Critérios de conclusão
 
 Cada linha do checklist do [desafio](docs/desafio.md), com onde ela está
-cumprida — e, onde a cobertura é **parcial**, o que falta e por quê.
+cumprida e como reproduzir a verificação.
 
 | Critério | Situação | Onde está | Evidência |
 |---|---|---|---|
 | Frontend e backend rodando localmente | ✅ | `chat-web`, `api-auth`, `mcp-server` | [Como rodar](#como-rodar) |
 | Login funcionando; chat inacessível sem autenticação | ✅ | `api-auth` (JWT HS256, senha com scrypt); `chat-web` redireciona para `/login` sem sessão | [ADR 0004](docs/adr/0004-authentication-jwt-cpf.md) |
 | Servidor MCP com as 3 tools expostas e descobertas pelo agente | ✅ | `mcp-server` via Streamable HTTP | Painel de ferramentas em todas as capturas |
-| Tools respeitam os contratos de argumentos e retorno | ⚠️ **parcial** | Retornos conferem; os *schemas anunciados* são mais frouxos que o contrato — `quantidade` é `z.number()` em vez de inteiro positivo, `metodo_pagamento` é `z.string()` em vez de `cartao \| pix`. O backend valida as duas regras antes de qualquer efeito, mas o modelo recebe um contrato mais permissivo do que deveria | [issue #20](https://github.com/isafirmino/agentic-payment-chatbot/issues/20) |
+| Tools respeitam os contratos de argumentos e retorno | ✅ | Os retornos seguem o contrato; os schemas anunciam `quantidade` como inteiro positivo e `metodo_pagamento` como `cartao \| pix`; o backend repete as validações antes de qualquer efeito | `mcp-server/src/server.ts` · `mcp-server/src/tools.check.ts` · smoke MCP |
 | Compra concluída com `cartao` **e** com `pix` | ✅ | `realizar_compra` | 📸 1 e 2 |
-| `realizar_compra` exige `intencao_id` válido e recusa id inventado | ⚠️ **parcial** | Id inexistente, vazio ou de outro CPF é recusado. Mas o desafio pede vínculo com a **sessão/conversa atual**, e a intenção é gravada só com `owner_cpf` — uma intenção pendente criada noutra aba pelo mesmo usuário seria aceita. Ficou fora de escopo na task #8 (`specs/006-purchase-payment/spec.md`) | 📸 4 · `scripts/verificar-recusas.mjs` · [issue #21](https://github.com/isafirmino/agentic-payment-chatbot/issues/21) |
+| `realizar_compra` exige `intencao_id` válido e recusa id inventado | ✅ | Id inexistente, vazio, de outro CPF ou de outra conversa é recusado. A intenção é vinculada a `owner_cpf` e `conversa_id`, e intenções anteriores à migração não são pagáveis | [ADR 0007](docs/adr/0007-intencao-vinculada-a-conversa.md) · 📸 4 · `scripts/verificar-recusas.mjs` · testes de conversa |
 | Tentativa acima do limite retorna erro | ✅ | `LIMITE_EXCEDIDO` antes de qualquer efeito | 📸 3 |
 | Limite armazenado e validado no backend | ✅ | `usuarios.limite_cents` no SQLite; recalculado a cada compra | [ADR 0006](docs/adr/0006-compra-atomica-e-limite-acumulado.md) · 📸 3 |
 | Histórico completo enviado ao modelo a cada turno | ✅ | `chat-web/src/lib/chat/payload.ts`, incluindo chamadas de tool e resultados | Painel "Enviado ao modelo" em todas as capturas |
@@ -242,9 +242,10 @@ cumprida — e, onde a cobertura é **parcial**, o que falta e por quê.
 | Log auditável de **cada chamada de tool** | ✅ | `chamadas_tool` registra tool, CPF, argumentos, resultado, desfecho e instante de toda chamada que chega a executar — inclusive as **recusadas**, que `transacoes` nunca viu. Consulta com `node scripts/consultar-chamadas.mjs`; decisões no [ADR 0008](docs/adr/0008-log-auditavel-de-chamadas-de-tool.md) |
 | Teste de jailbreak | ✅ | 📸 5 e 6 |
 
-As três lacunas acima são de escopo, não defeitos: o backend valida tudo o que
-precisa antes de mover dinheiro. Estão registradas como issues para não se
-perderem numa tabela de conformidade que dissesse "cumprido" sem ressalva.
+As lacunas que antes estavam registradas nas issues #20 e #21 foram fechadas:
+os schemas MCP foram restringidos na PR #23 e o vínculo entre intenção e
+conversa foi entregue na PR #25. A auditoria reproduzível mais recente está em
+[`docs/auditoria-conformidade.md`](docs/auditoria-conformidade.md).
 
 ---
 
@@ -366,27 +367,26 @@ O CPF vem do JWT — nunca dos argumentos da tool.
 
 ✔ método fora do contrato
     realizar_compra {"intencao_id":"int_falsa123","metodo_pagamento":"boleto"}
-    -> {"status":"recusado","erro":"INTENCAO_INVALIDA","mensagem":"Intenção inválida para o usuário autenticado."}
+    -> schema: Invalid arguments
 
 ✔ intenção já paga
     realizar_compra {"intencao_id":"int_a04132","metodo_pagamento":"pix"}
     -> {"status":"recusado","erro":"INTENCAO_JA_PAGA","mensagem":"Esta intenção de compra já foi utilizada."}
 
-✔ Todos os 5 identificadores inválidos foram recusados pelo backend.
+✔ Todos os 5 casos foram recusados — pelo backend ou pelo schema.
 ```
 
 O script compara cada retorno com o código de erro esperado e sai com status
-diferente de zero se algum divergir — dá para rodar em CI.
+diferente de zero se algum divergir — dá para rodar em CI. Valores fora do
+contrato, como `boleto`, são barrados pelo schema MCP antes de a tool executar;
+os casos de domínio chegam ao backend e retornam o erro estruturado esperado.
 
 O último caso usa `int_a04132`, a intenção real da compra aprovada na
-evidência 1, e demonstra a defesa contra cobrança dupla. Todas as recusas são
-retorno estruturado, nunca exceção.
-
-> Uma ressalva honesta: essa verificação cobre id inexistente, vazio, de outro
-> usuário e já pago. Ela **não** cobre o vínculo com a conversa, que o desafio
-> também pede e que hoje não existe — ver a linha correspondente nos
-> [critérios de conclusão](#critérios-de-conclusão) e a
-> [issue #21](https://github.com/isafirmino/agentic-payment-chatbot/issues/21).
+evidência 1, e demonstra a defesa contra cobrança dupla. O vínculo com a
+conversa é coberto pelos testes de `mcp-server/src/tools.check.ts`: uma intenção
+da conversa A é recusada na conversa B, inclusive para o mesmo CPF. O smoke MCP
+também prova que as tools de intenção recusam chamadas sem `X-Conversa-Id`,
+enquanto o catálogo continua disponível com um JWT válido.
 
 ### 8. O log auditável ao final da sessão real
 
