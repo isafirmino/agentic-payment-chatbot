@@ -8,6 +8,13 @@ A regra que organiza o projeto inteiro: **o modelo nunca decide se uma compra
 acontece.** Ele conversa e chama as ferramentas; quem valida propriedade,
 prazo, método e limite — e quem calcula o valor — é sempre o servidor.
 
+> Instruções completas de execução do projeto ficam neste README raiz. Os
+> READMEs específicos em cada pasta documentam somente os detalhes daquele
+> serviço:
+> - [api-auth](api-auth/README.md)
+> - [mcp-server](mcp-server/README.md)
+> - [chat-web](chat-web/README.md)
+
 ```
 chat-web  :3000        api-auth  :3001        mcp-server  :4000
  Next.js                Express + JWT          Streamable HTTP
