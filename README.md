@@ -155,11 +155,36 @@ soma de `valor_cents` do CPF —, e não com uma segunda implementação da regr
 banco é aberto em modo somente leitura: um relatório não deve poder alterar
 aquilo que audita.
 
-A tabela guarda apenas compras **aprovadas**. Chamadas de catálogo, registros
-de intenção e compras recusadas não são gravadas — ver
-[issue #22](https://github.com/isafirmino/agentic-payment-chatbot/issues/22).
+### Cada chamada de tool
 
-Para verificar as recusas, existe um script separado que chama o MCP direto:
+`transacoes` guarda apenas compras **aprovadas**. A trilha completa — inclusive
+catálogo, intenções e todas as **recusas** — fica em `chamadas_tool`:
+
+```bash
+node scripts/consultar-chamadas.mjs [cpf] [tool]
+```
+
+```
+01/09/2026, 14:52:58  realizar_compra  11122233344  → LIMITE_EXCEDIDO
+    pedido:   {"intencao_id":"int_47a67c","metodo_pagamento":"cartao"}
+    resposta: {"status":"recusado","erro":"LIMITE_EXCEDIDO","mensagem":"O valor da compra excede o limite restante."}
+
+01/09/2026, 14:52:58  realizar_compra  11122233344  → INTENCAO_INVALIDA
+    pedido:   {"intencao_id":"int_falsa","metodo_pagamento":"pix"}
+    resposta: {"status":"recusado","erro":"INTENCAO_INVALIDA","mensagem":"Intenção inválida para o usuário autenticado."}
+
+5 chamada(s).  consultado: 1  |  pendente: 1  |  LIMITE_EXCEDIDO: 1  |  INTENCAO_INVALIDA: 1  |  ESTOQUE_INSUFICIENTE: 1
+```
+
+O registro é feito **fora** da transação da compra, de propósito: uma recusa faz
+`ROLLBACK` de tudo o que tocou, e um log gravado por dentro sumiria junto com a
+tentativa que ele deveria documentar. As fronteiras da trilha — o que entra, o
+que não entra e por quê — estão no
+[ADR 0008](docs/adr/0008-log-auditavel-de-chamadas-de-tool.md).
+
+### Provar a recusa sem depender do modelo
+
+Existe ainda um script que chama o MCP direto:
 
 ```bash
 node scripts/verificar-recusas.mjs <cpf> <senha> [intencao_ja_paga]
@@ -193,7 +218,7 @@ cumprida — e, onde a cobertura é **parcial**, o que falta e por quê.
 
 | Extra | Situação | Onde está |
 |---|---|---|
-| Log auditável de **cada chamada de tool** | ⚠️ **parcial** | A tabela `transacoes` registra quem, quando, quanto e o resultado de cada compra **aprovada**. Chamadas de catálogo, registros de intenção e compras **recusadas** não são gravadas — só aparecem no painel do chat, que é volátil. Ver [issue #22](https://github.com/isafirmino/agentic-payment-chatbot/issues/22) |
+| Log auditável de **cada chamada de tool** | ✅ | `chamadas_tool` registra tool, CPF, argumentos, resultado, desfecho e instante de toda chamada que chega a executar — inclusive as **recusadas**, que `transacoes` nunca viu. Consulta com `node scripts/consultar-chamadas.mjs`; decisões no [ADR 0008](docs/adr/0008-log-auditavel-de-chamadas-de-tool.md) |
 | Teste de jailbreak | ✅ | 📸 5 e 6 |
 
 As três lacunas acima são de escopo, não defeitos: o backend valida tudo o que

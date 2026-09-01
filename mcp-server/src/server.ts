@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { resolveCpf, resolveJwtSecret, Unauthorized } from './auth.ts'
+import { registrarChamada } from './audit.ts'
 import { getDb } from './db.ts'
 import { bootstrapSchema, seedProducts } from './schema.ts'
 import { listarCatalogo, realizarCompra, registrarIntencao } from './tools.ts'
@@ -22,6 +23,36 @@ function json(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value) }] }
 }
 
+/**
+ * Embrulha o corpo de uma tool para registrá-la no log de auditoria.
+ *
+ * Aplicado no ponto de declaração, e não dentro de cada tool, por dois
+ * motivos: fica num lugar só, e uma tool nova nasce auditada sem ninguém
+ * precisar lembrar disso.
+ *
+ * Roda o corpo, grava, e devolve o resultado SEM tocar nele. Se o corpo
+ * lançar, registra o desfecho e relança — auditoria não engole exceção.
+ * Ver ADR 0008.
+ */
+function auditada<Args>(tool: string, corpo: (args: Args) => unknown) {
+  return async (args: Args) => {
+    const cpf = currentCpf()
+    try {
+      const resultado = corpo(args)
+      registrarChamada(getDb(), { tool, ownerCpf: cpf, argumentos: args, resultado })
+      return json(resultado)
+    } catch (erro) {
+      registrarChamada(getDb(), {
+        tool,
+        ownerCpf: cpf,
+        argumentos: args,
+        resultado: { erro: 'EXCECAO', mensagem: String(erro) },
+      })
+      throw erro
+    }
+  }
+}
+
 const mcp = new McpServer({ name: 'agentic-payment', version: '1.0.0' })
 
 mcp.registerTool(
@@ -32,7 +63,9 @@ mcp.registerTool(
       categoria: z.string().optional().describe('Categoria opcional, por exemplo: monitores.'),
     },
   },
-  async ({ categoria }) => json(listarCatalogo(getDb(), { categoria })),
+  auditada('listar_catalogo', ({ categoria }: { categoria?: string }) =>
+    listarCatalogo(getDb(), { categoria }),
+  ),
 )
 
 mcp.registerTool(
@@ -48,8 +81,11 @@ mcp.registerTool(
       quantidade: z.number().int().positive().describe('Quantidade desejada, inteiro maior que zero.'),
     },
   },
-  async ({ produto_id, quantidade }) =>
-    json(registrarIntencao(getDb(), currentCpf(), { produto_id, quantidade })),
+  auditada(
+    'registrar_intencao',
+    ({ produto_id, quantidade }: { produto_id: string; quantidade: number }) =>
+      registrarIntencao(getDb(), currentCpf(), { produto_id, quantidade }),
+  ),
 )
 
 mcp.registerTool(
@@ -64,8 +100,16 @@ mcp.registerTool(
       metodo_pagamento: z.enum(['cartao', 'pix']).describe('Método de pagamento.'),
     },
   },
-  async ({ intencao_id, metodo_pagamento }) =>
-    json(realizarCompra(getDb(), currentCpf(), { intencao_id, metodo_pagamento })),
+  auditada(
+    'realizar_compra',
+    ({
+      intencao_id,
+      metodo_pagamento,
+    }: {
+      intencao_id: string
+      metodo_pagamento: 'cartao' | 'pix'
+    }) => realizarCompra(getDb(), currentCpf(), { intencao_id, metodo_pagamento }),
+  ),
 )
 
 const app = express()
