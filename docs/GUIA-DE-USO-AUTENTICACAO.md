@@ -116,6 +116,7 @@ Hoje não tem botão de "Sair" na interface. Pra deslogar manualmente:
 ### "Não consigo cadastrar, dá erro de conexão"
 - O `api-auth` está rodando? Rode `cd api-auth && npm start` num terminal separado.
 - A porta `3001` está livre? Se outra coisa estiver usando, mude o `PORT` no `api-auth/.env`.
+- O erro no console do navegador é `TypeError: Failed to fetch` (não um JSON de erro)? Isso é CORS: `CORS_ORIGIN` no `api-auth/.env` precisa ser exatamente a URL de onde o `chat-web` está servido (`http://localhost:3000` por padrão) — sem isso o navegador bloqueia a resposta antes do JS conseguir ler.
 
 ### "Login retorna 'CPF ou senha inválidos' mas eu acabei de me cadastrar"
 - CPF foi digitado igual ao do cadastro? (sem pontos, sem traços)
@@ -127,4 +128,4 @@ Hoje não tem botão de "Sair" na interface. Pra deslogar manualmente:
 
 ---
 
-> Dúvidas? Veja o ADR `docs/adr/0003-authentication-jwt-cpf.md` ou a spec `specs/003-authentication/spec.md`.
+> Dúvidas? Veja o ADR `docs/adr/0004-authentication-jwt-cpf.md` ou a spec `specs/004-authentication/spec.md`.

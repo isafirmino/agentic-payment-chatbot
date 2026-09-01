@@ -44,7 +44,7 @@ Implementação em duas frentes paralelas: backend (`api-auth/`) e frontend (`ch
 | `chat-web/src/app/page.tsx`               | modificar | Gate client-side com useEffect                                                                     |
 | `chat-web/src/app/api/chat/route.ts`      | modificar | Passar header Authorization pro MCP                                                                |
 | `chat-web/.env.example`                   | modificar | Adicionar `NEXT_PUBLIC_AUTH_URL`                                                                   |
-| `docs/adr/0003-authentication-jwt-cpf.md` | criar     | ADR registrando JWT sub=cpf, DEFAULT_LIMITE, compartilhamento de JWT_SECRET                        |
+| `docs/adr/0004-authentication-jwt-cpf.md` | criar     | ADR registrando JWT sub=cpf, DEFAULT_LIMITE, compartilhamento de JWT_SECRET                        |
 
 ## Dependências externas
 

@@ -64,7 +64,7 @@ Marque cada item conforme completa. Não avance para o próximo bloco sem finali
 
 ### Documentação
 
-- [x] Criar ADR em `docs/adr/0003-authentication-jwt-cpf.md` registrando:
+- [x] Criar ADR em `docs/adr/0004-authentication-jwt-cpf.md` registrando:
   - Decisão de usar JWT com `sub=cpf` (sem `role`, sem limite no payload)
   - `DEFAULT_LIMITE_CENTS = 100000` pra todos
   - Compartilhamento de `JWT_SECRET` entre `api-auth` e `mcp-server`
@@ -109,7 +109,7 @@ Marque cada item conforme completa. Não avance para o próximo bloco sem finali
 
 - [x] Ler `Authorization` header: `request.headers.get('authorization')`
 - [x] Repassar pro MCP: `new StreamableHTTPClientTransport({ url, requestInit: { headers: { Authorization: authHeader } } })`
-- [ ] Se sem header: retornar erro 401 (ou deixar vazio e MCP rejeita)
+- [x] Se sem header: retornar erro 401 (ou deixar vazio e MCP rejeita) — implementado deixando vazio e distinguindo, no catch, uma rejeição do MCP (`StreamableHTTPError` 401/403 → propaga o mesmo status) de qualquer outra falha (degrada sem tools). Ver Emenda em `spec.md`.
 
 ### Testes manuais
 
@@ -127,7 +127,7 @@ Marque cada item conforme completa. Não avance para o próximo bloco sem finali
 - [x] Rodar `npm run check` em `api-auth/` (testes + cobertura 80%)
 - [x] Rodar `npm run check` em `chat-web/` (lint + typecheck)
 - [ ] Testar ponta-a-ponta: usuário novo → cadastro → login → chat → enviar mensagem
-- [ ] Coordenar com Task B: confirmar que `mcp-server` chama `GET /usuarios/me/limite` antes de `realizar_compra`
+- [x] Coordenar com Task B: a task #8 (`realizar_compra`) **não** chama `GET /usuarios/me/limite` — lê `usuarios.limite_cents` direto da tabela compartilhada, reaproveitando a conexão de `db.ts` da task #7. Ver Emenda em `spec.md` e ADR 0004.
 
 ---
 
