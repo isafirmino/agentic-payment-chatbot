@@ -26,7 +26,9 @@ export default function AuthCard({
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8">{children}</div>
+        <div className="bg-white rounded-2xl shadow-2xl p-8 dark:bg-gray-900">
+          {children}
+        </div>
 
         {/* Rodapé */}
         <div className="text-center mt-6 text-white/90">{footer}</div>

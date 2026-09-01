@@ -65,7 +65,7 @@ export default function CadastroPage() {
         <div>
           <label
             htmlFor="nome"
-            className="block text-sm font-medium text-gray-700 mb-1.5"
+            className="block text-sm font-medium text-gray-700 mb-1.5 dark:text-gray-300"
           >
             Nome
           </label>
@@ -77,14 +77,14 @@ export default function CadastroPage() {
             required
             disabled={carregando}
             placeholder="Seu nome completo"
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-uol-blue focus:ring-2 focus:ring-uol-blue/30 outline-none transition disabled:opacity-60"
+            className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-uol-blue focus:ring-2 focus:ring-uol-blue/30 outline-none transition disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
           />
         </div>
 
         <div>
           <label
             htmlFor="cpf"
-            className="block text-sm font-medium text-gray-700 mb-1.5"
+            className="block text-sm font-medium text-gray-700 mb-1.5 dark:text-gray-300"
           >
             CPF
           </label>
@@ -96,14 +96,14 @@ export default function CadastroPage() {
             required
             disabled={carregando}
             placeholder="000.000.000-00"
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-uol-blue focus:ring-2 focus:ring-uol-blue/30 outline-none transition disabled:opacity-60"
+            className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-uol-blue focus:ring-2 focus:ring-uol-blue/30 outline-none transition disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
           />
         </div>
 
         <div>
           <label
             htmlFor="senha"
-            className="block text-sm font-medium text-gray-700 mb-1.5"
+            className="block text-sm font-medium text-gray-700 mb-1.5 dark:text-gray-300"
           >
             Senha
           </label>
@@ -116,7 +116,7 @@ export default function CadastroPage() {
               required
               disabled={carregando}
               placeholder="••••••••"
-              className="w-full px-4 py-3 pr-24 rounded-lg border border-gray-300 focus:border-uol-blue focus:ring-2 focus:ring-uol-blue/30 outline-none transition disabled:opacity-60"
+              className="w-full px-4 py-3 pr-24 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-uol-blue focus:ring-2 focus:ring-uol-blue/30 outline-none transition disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
             />
             <button
               type="button"
