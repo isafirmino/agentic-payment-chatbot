@@ -6,6 +6,7 @@ import { getDb } from '../src/db.ts'
 const MCP_URL = process.env.MCP_URL ?? 'http://localhost:4000/mcp'
 const JWT_SECRET = process.env.JWT_SECRET ?? 'workshop-dev-secret-do-not-use-in-prod'
 const CPF = String(Date.now()).slice(-11)
+const CONVERSA = crypto.randomUUID()
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
@@ -71,7 +72,9 @@ async function main() {
 
     const token = jwt.sign({}, JWT_SECRET, { subject: CPF, expiresIn: '1h', algorithm: 'HS256' })
     transport = new StreamableHTTPClientTransport(new URL(MCP_URL), {
-      requestInit: { headers: { Authorization: `Bearer ${token}` } },
+      requestInit: {
+        headers: { Authorization: `Bearer ${token}`, 'X-Conversa-Id': CONVERSA },
+      },
     })
     const client = new Client({ name: 'purchase-payment-smoke', version: '1.0.0' })
     await client.connect(transport)
@@ -139,6 +142,33 @@ async function main() {
       'método fora do enum',
     )
 
+    // A exigência do cabeçalho vive no handler HTTP, que os testes de unidade
+    // não alcançam — eles chamam as funções direto. Sem isto, remover a
+    // exigência não quebraria nenhum teste.
+    const semConversa = new Client({ name: 'sem-conversa-smoke', version: '1.0.0' })
+    const transporteSemConversa = new StreamableHTTPClientTransport(new URL(MCP_URL), {
+      requestInit: { headers: { Authorization: `Bearer ${token}` } },
+    })
+    try {
+      await semConversa.connect(transporteSemConversa)
+
+      // Catálogo não cria nem consome intenção: continua livre.
+      const catalogoLivre = parse(
+        await semConversa.callTool({ name: 'listar_catalogo', arguments: {} }),
+      )
+      assert(catalogoLivre.produtos.length === 5, 'catalog should not require a conversation')
+
+      for (const [name, args] of [
+        ['registrar_intencao', { produto_id: 'prod_001', quantidade: 1 }],
+        ['realizar_compra', { intencao_id: 'int_qualquer', metodo_pagamento: 'pix' }],
+      ]) {
+        const saida = await semConversa.callTool({ name, arguments: args })
+        assert(saida.isError === true, `${name} aceitou chamada sem X-Conversa-Id`)
+      }
+    } finally {
+      await transporteSemConversa.close()
+    }
+
     // O envelope de auditoria vive no server.ts, entre o protocolo e as tools.
     // Os testes de unidade chamam as funções direto, então nunca passam por
     // ele: sem esta conferência, remover o envelope não quebraria nada.
@@ -167,7 +197,9 @@ async function main() {
       'chamada barrada pelo schema não deveria aparecer no log',
     )
 
-    console.log('✔ Smoke test OK — auth, discovery, catalog, intention, purchase, schemas and audit passed.')
+    console.log(
+      '✔ Smoke test OK — auth, conversation, discovery, catalog, intention, purchase, schemas and audit passed.',
+    )
   } finally {
     await transport?.close()
     cleanupSmokeData(db)

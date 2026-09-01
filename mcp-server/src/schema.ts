@@ -26,6 +26,7 @@ export function bootstrapSchema(db: DatabaseSync): void {
       valor_total_cents INTEGER NOT NULL CHECK (valor_total_cents >= 0),
       status TEXT NOT NULL DEFAULT 'pendente',
       owner_cpf TEXT NOT NULL,
+      conversa_id TEXT,
       criada_em TEXT NOT NULL,
       expira_em TEXT NOT NULL
     );
@@ -60,7 +61,31 @@ export function bootstrapSchema(db: DatabaseSync): void {
       data TEXT NOT NULL
     );
   `)
+
+  migrateConversaId(db)
 }
+
+/**
+ * Acrescenta `intencoes.conversa_id` num banco criado antes do ADR 0007.
+ *
+ * `CREATE TABLE IF NOT EXISTS` não altera tabela existente, então sem isto a
+ * coluna só apareceria em bancos novos e o `mcp-server` quebraria em qualquer
+ * banco já em uso.
+ *
+ * Consulta as colunas antes em vez de tentar o ALTER e engolir o erro: engolir
+ * esconderia uma falha diferente (banco somente leitura, tabela corrompida) e
+ * transformaria isso num bug silencioso.
+ *
+ * A coluna é anulável de propósito. Intenções gravadas antes desta migração
+ * ficam com NULL, e NULL não casa com conversa nenhuma na comparação de
+ * igualdade — deixam de ser pagáveis sem precisarem ser apagadas.
+ */
+function migrateConversaId(db: DatabaseSync): void {
+  const colunas = db.prepare(`PRAGMA table_info(intencoes)`).all() as { name: string }[]
+  if (colunas.some(({ name }) => name === 'conversa_id')) return
+  db.exec(`ALTER TABLE intencoes ADD COLUMN conversa_id TEXT`)
+}
+
 export function seedProducts(db: DatabaseSync): void {
   const insert = db.prepare(`
     INSERT OR IGNORE INTO produtos (id, nome, preco_cents, moeda, estoque, categoria)

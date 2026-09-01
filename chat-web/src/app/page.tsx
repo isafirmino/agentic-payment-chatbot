@@ -20,6 +20,11 @@ export default function Page() {
     undefined,
   )
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Identidade desta conversa, gerada uma vez e mantida só em memória: um
+  // reload começa outra conversa, e a intenção registrada na anterior deixa de
+  // ser pagável. É o que torna a regra verdadeira — sem histórico não há
+  // conversa. Ver ADR 0007.
+  const conversaId = useRef<string>(crypto.randomUUID())
 
   // Gate: checa autenticação no mount
   useEffect(() => {
@@ -99,7 +104,7 @@ export default function Page() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.token}`,
         },
-        body: JSON.stringify({ messages: payload }),
+        body: JSON.stringify({ messages: payload, conversaId: conversaId.current }),
       })
       if (res.status === 401 || res.status === 403) {
         redirectToLogin('Sua sessão expirou. Faça login novamente.')

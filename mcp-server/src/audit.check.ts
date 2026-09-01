@@ -7,6 +7,9 @@ import { realizarCompra, registrarIntencao } from './tools.ts'
 
 const CPF = '12345678900'
 const NOW = new Date('2026-08-31T12:00:00.000Z')
+// A intenção é vinculada à conversa desde o ADR 0007; aqui basta ser a mesma
+// no registro e no pagamento, como numa conversa real.
+const CONVERSA = '3f1a9c2e-7b48-4d6a-9f01-2c5e8a4b7d13'
 
 function setupDb(limiteCents = 30000): DatabaseSync {
   const db = new DatabaseSync(':memory:')
@@ -103,11 +106,11 @@ test('uma compra recusada por limite nao cria transacao, mas deixa rastro no log
   // tocou, então um log gravado por dentro da transação sumiria junto com a
   // tentativa que ele deveria documentar. Ver ADR 0008.
   const db = setupDb(10000)
-  const intencao = registrarIntencao(db, CPF, { produto_id: 'prod_001', quantidade: 1 }, NOW) as {
+  const intencao = registrarIntencao(db, CPF, CONVERSA, { produto_id: 'prod_001', quantidade: 1 }, NOW) as {
     intencao_id: string
   }
   const args = { intencao_id: intencao.intencao_id, metodo_pagamento: 'cartao' as const }
-  const recusa = realizarCompra(db, CPF, args, NOW)
+  const recusa = realizarCompra(db, CPF, CONVERSA, args, NOW)
 
   registrarChamada(db, { tool: 'realizar_compra', ownerCpf: CPF, argumentos: args, resultado: recusa }, NOW)
 

@@ -64,6 +64,7 @@ export function listarCatalogo(db: DatabaseSync, args: { categoria?: unknown }) 
 export function registrarIntencao(
   db: DatabaseSync,
   ownerCpf: string,
+  conversaId: string,
   args: { produto_id?: unknown; quantidade?: unknown },
   now = new Date(),
 ) {
@@ -90,9 +91,9 @@ export function registrarIntencao(
 
   db.prepare(
     `INSERT INTO intencoes
-      (id, produto_id, quantidade, valor_total_cents, status, owner_cpf, criada_em, expira_em)
-     VALUES (?, ?, ?, ?, 'pendente', ?, ?, ?)`,
-  ).run(intentionId, product.id, quantity, totalCents, ownerCpf, createdAt, expiresAt)
+      (id, produto_id, quantidade, valor_total_cents, status, owner_cpf, conversa_id, criada_em, expira_em)
+     VALUES (?, ?, ?, ?, 'pendente', ?, ?, ?, ?)`,
+  ).run(intentionId, product.id, quantity, totalCents, ownerCpf, conversaId, createdAt, expiresAt)
 
   return {
     intencao_id: intentionId,
@@ -109,6 +110,7 @@ export function registrarIntencao(
 export function realizarCompra(
   db: DatabaseSync,
   ownerCpf: string,
+  conversaId: string,
   args: { intencao_id?: unknown; metodo_pagamento?: unknown },
   now = new Date(),
 ) {
@@ -125,10 +127,14 @@ export function realizarCompra(
     transactionOpen = true
 
     const intentionId = typeof args.intencao_id === 'string' ? args.intencao_id : ''
+    // conversa_id entra na MESMA condição de id e owner_cpf, não numa checagem
+    // depois: assim não existe janela entre validar e usar. Intenção anterior
+    // ao ADR 0007 tem conversa_id NULL, e NULL nunca casa numa igualdade — ela
+    // deixa de ser pagável por consequência da regra, sem precisar ser apagada.
     const intention = db.prepare(
       `SELECT id, produto_id, quantidade, valor_total_cents, status, expira_em
-       FROM intencoes WHERE id = ? AND owner_cpf = ?`,
-    ).get(intentionId, ownerCpf) as IntentionRow | undefined
+       FROM intencoes WHERE id = ? AND owner_cpf = ? AND conversa_id = ?`,
+    ).get(intentionId, ownerCpf, conversaId) as IntentionRow | undefined
     const user = db.prepare(`SELECT limite_cents FROM usuarios WHERE cpf = ?`).get(ownerCpf) as
       | UserLimitRow
       | undefined

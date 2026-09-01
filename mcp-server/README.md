@@ -56,6 +56,31 @@ O token é validado com HS256 e o CPF vem de `sub`, conforme o contrato do
 o `mcp-server` não inicia sem essa variável; em desenvolvimento, usa o segredo
 de workshop como fallback.
 
+## Identidade da conversa
+
+As tools que criam ou consomem intenção exigem, além do token:
+
+```http
+X-Conversa-Id: <UUID v4>
+```
+
+| Tool | Exige o cabeçalho |
+|---|---|
+| `listar_catalogo` | não — não cria nem consome intenção |
+| `registrar_intencao` | **sim** — grava a conversa junto da intenção |
+| `realizar_compra` | **sim** — só aprova na conversa que registrou |
+
+A intenção é buscada por `id`, `owner_cpf` **e** `conversa_id` na mesma
+consulta. Uma intenção registrada em outra conversa, ou gravada antes desta
+regra existir (`conversa_id` nulo), recebe `INTENCAO_INVALIDA` — o mesmo código
+de um identificador inexistente, para não revelar que ele existe.
+
+O identificador vem por cabeçalho e **nunca** como argumento de tool: se fosse
+argumento, o modelo poderia informá-lo, e uma trava que o próprio modelo
+preenche não é trava. Um cabeçalho ausente é recusado pelas tools de intenção;
+um malformado é recusado com HTTP 401 antes de qualquer tool rodar. Ver o
+[ADR 0007](../docs/adr/0007-intencao-vinculada-a-conversa.md).
+
 ## Persistência
 
 O serviço reaproveita o SQLite compartilhado da task #6, configurado por
