@@ -3,6 +3,7 @@ import express, {
   type Response,
   type NextFunction,
 } from "express";
+import cors from "cors";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import jwt from "jsonwebtoken";
 import { getDb } from "./db.js";
@@ -34,6 +35,7 @@ const JWT_SECRET =
   process.env.JWT_SECRET || "workshop-dev-secret-do-not-use-in-prod";
 const JWT_TTL = "1h";
 const DEFAULT_LIMITE_CENTS = Number(process.env.DEFAULT_LIMITE_CENTS) || 100000;
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:3000";
 
 declare global {
   namespace Express {
@@ -74,6 +76,7 @@ function authenticate(req: Request, res: Response, next: NextFunction) {
 }
 
 export const app = express();
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 
 app.get("/health", (_req, res) =>
