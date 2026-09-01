@@ -10,6 +10,23 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Paleta UOL */
+  --color-uol-blue: #1b5eab;
+  --color-uol-blue-dark: #154a87;
+  --color-uol-blue-darker: #0e2f5a;
+  --color-uol-blue-light: #3b82c4;
+  --color-uol-red: #e60000;
+  --color-uol-yellow: #ffd100;
+  --color-uol-green: #00a859;
+}
+
+/* Fundo em gradiente com tons de azul UOL */
+.auth-bg {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgb(59 130 196 / 0.35), transparent 60%),
+    radial-gradient(1000px 500px at 110% 10%, rgb(14 47 90 / 0.6), transparent 55%),
+    linear-gradient(135deg, #1b5eab 0%, #154a87 50%, #0e2f5a 100%);
 }
 
 @media (prefers-color-scheme: dark) {

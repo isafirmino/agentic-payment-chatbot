@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import AuthCard from '@/components/auth/AuthCard'
 
 export default function CadastroPage() {
   const router = useRouter()
@@ -45,11 +46,29 @@ export default function CadastroPage() {
   }
 
   return (
-    <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px' }}>
-      <h1>Cadastro</h1>
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="nome">Nome:</label>
+    <AuthCard
+      title="Crie sua conta"
+      subtitle="Cadastre-se para começar a comprar"
+      footer={
+        <>
+          Já tem conta?{' '}
+          <Link
+            href="/login"
+            className="font-semibold text-white underline underline-offset-2 hover:text-uol-yellow transition-colors"
+          >
+            Faça login
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div>
+          <label
+            htmlFor="nome"
+            className="block text-sm font-medium text-gray-700 mb-1.5 dark:text-gray-300"
+          >
+            Nome
+          </label>
           <input
             id="nome"
             type="text"
@@ -57,12 +76,18 @@ export default function CadastroPage() {
             onChange={(e) => setNome(e.target.value)}
             required
             disabled={carregando}
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+            placeholder="Seu nome completo"
+            className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-uol-blue focus:ring-2 focus:ring-uol-blue/30 outline-none transition disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
           />
         </div>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="cpf">CPF:</label>
+        <div>
+          <label
+            htmlFor="cpf"
+            className="block text-sm font-medium text-gray-700 mb-1.5 dark:text-gray-300"
+          >
+            CPF
+          </label>
           <input
             id="cpf"
             type="text"
@@ -70,13 +95,19 @@ export default function CadastroPage() {
             onChange={(e) => setCpf(e.target.value)}
             required
             disabled={carregando}
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+            placeholder="000.000.000-00"
+            className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-uol-blue focus:ring-2 focus:ring-uol-blue/30 outline-none transition disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
           />
         </div>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="senha">Senha:</label>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '5px' }}>
+        <div>
+          <label
+            htmlFor="senha"
+            className="block text-sm font-medium text-gray-700 mb-1.5 dark:text-gray-300"
+          >
+            Senha
+          </label>
+          <div className="relative">
             <input
               id="senha"
               type={mostrarSenha ? 'text' : 'password'}
@@ -84,13 +115,15 @@ export default function CadastroPage() {
               onChange={(e) => setSenha(e.target.value)}
               required
               disabled={carregando}
-              style={{ flex: 1, padding: '8px' }}
+              placeholder="••••••••"
+              className="w-full px-4 py-3 pr-24 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-uol-blue focus:ring-2 focus:ring-uol-blue/30 outline-none transition disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
             />
             <button
               type="button"
               onClick={() => setMostrarSenha((value) => !value)}
               disabled={carregando}
               aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+              className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 text-sm font-medium text-uol-blue hover:bg-uol-blue/10 rounded-md transition"
             >
               {mostrarSenha ? 'Ocultar' : 'Mostrar'}
             </button>
@@ -98,35 +131,20 @@ export default function CadastroPage() {
         </div>
 
         {erro && (
-          <div style={{ color: 'red', marginBottom: '15px' }}>{erro}</div>
+          <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+            <span aria-hidden="true">⚠</span>
+            <span>{erro}</span>
+          </div>
         )}
 
         <button
           type="submit"
           disabled={carregando}
-          style={{
-            width: '100%',
-            padding: '10px',
-            backgroundColor: carregando ? '#ccc' : '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: carregando ? 'not-allowed' : 'pointer',
-          }}
+          className="w-full py-3 rounded-lg font-semibold text-white bg-uol-blue hover:bg-uol-blue-dark focus:ring-4 focus:ring-uol-blue/30 transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {carregando ? 'Cadastrando...' : 'Cadastrar'}
         </button>
       </form>
-
-      <p style={{ marginTop: '20px', textAlign: 'center' }}>
-        Já tem conta?{' '}
-        <Link
-          href="/login"
-          style={{ color: '#007bff', textDecoration: 'none' }}
-        >
-          Faça login
-        </Link>
-      </p>
-    </div>
+    </AuthCard>
   )
 }
