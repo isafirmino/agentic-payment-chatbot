@@ -28,8 +28,8 @@
 
 ## Execução e captura
 
-- [ ] Instalar Ollama, baixar `qwen2.5:7b` e criar os três `.env`
-- [ ] Subir os três serviços e confirmar que respondem nas portas 3001, 4000 e 3000
+- [x] Instalar Ollama, baixar `qwen2.5:7b` e criar os três `.env`
+- [x] Subir os três serviços e confirmar que respondem nas portas 3001, 4000 e 3000
 - [ ] Executar o roteiro completo, do cadastro à recusa por `intencao_id` inválido
 - [ ] Gravar `01-compra-aprovada-cartao.png` e `02-compra-aprovada-pix.png`
 - [ ] Gravar `03-limite-excedido.png` e `04-intencao-invalida.png`
