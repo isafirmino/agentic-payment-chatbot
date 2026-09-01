@@ -1,4 +1,4 @@
-# 003 — Cadastro, login e autenticação com JWT
+# 004 — Cadastro, login e autenticação com JWT
 
 ## Problema
 
@@ -112,11 +112,11 @@ normalmente, sem tools) mesmo sem `Authorization` válido, o que quebra o
 requisito de que pular o gate client-side não deve dar acesso real ao chat.
 Confirmado com uma chamada direta em `/api/chat` sem header `Authorization`,
 que retornava `200` com resposta real do modelo antes do fix. Corrigido
-distinguindo os dois casos: uma rejeição de autenticação
-(`StreamableHTTPError` com `code` 401 ou 403) agora retorna o mesmo status
-em `/api/chat`, bloqueando o chat; qualquer outro erro (por exemplo,
-`mcp-server` fora do ar) continua degradando para uma conversa sem tools,
-como antes.
+adotando falha fechada: uma rejeição de autenticação (`StreamableHTTPError`
+com `code` 401 ou 403) retorna o mesmo status em `/api/chat`; se o
+`mcp-server` estiver indisponível e não puder validar o JWT, a rota retorna
+503 e não chama o LLM. O chat não replica a validação do token nem recebe o
+`JWT_SECRET`; o MCP continua sendo a única autoridade dessa borda.
 
 **Fix: `api-auth` não tinha CORS configurado.** `chat-web` (porta 3000) e
 `api-auth` (porta 3001) são origens diferentes, e `api-auth` não respondia
@@ -130,6 +130,20 @@ isso porque `curl` não aplica CORS. Corrigido adicionando o middleware
 `cors` em `api-auth/src/app.ts`, com a origem permitida configurável via
 `CORS_ORIGIN` (default `http://localhost:3000`, documentado em
 `api-auth/.env.example` e `api-auth/README.md`).
+
+**Fix: sessão expirada não encerrava o acesso no frontend.** Ao receber 401
+ou 403 de `/api/chat`, o frontend agora remove `chat_session`, guarda uma
+mensagem de sessão expirada e redireciona para `/login`, onde a mensagem é
+exibida. Sessões ausentes, incompletas ou com JSON inválido também são
+removidas pelo gate antes de liberar a interface.
+
+**Hardening do `api-auth`.** `DEFAULT_LIMITE_CENTS=0` passa a ser aceito
+como limite legítimo; valores negativos, fracionários ou inválidos impedem
+o boot. JWT assinado sem `sub` é recusado com 401. Em produção,
+`JWT_SECRET` é obrigatório e o fallback conhecido existe apenas em
+desenvolvimento. O login executa a verificação scrypt também para CPF
+inexistente, reduzindo a diferença de tempo entre os dois erros de
+credencial.
 
 **Ajuste: `chat-web/src/app/page.tsx` foi reconciliado com a task #10.**
 O merge de `develop` trouxe a spec `specs/005-chat-prompt-history`, que

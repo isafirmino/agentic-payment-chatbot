@@ -30,7 +30,9 @@ Implementação em duas frentes paralelas: backend (`api-auth/`) e frontend (`ch
 ### 3. Integração
 
 1. **Teste ponta-a-ponta** — Usuário novo: cadastro → login → chat → enviar mensagem (token viaja no header)
-2. **Validação de limite** — Coordenar com Task B (mcp-server) pra confirmar que `GET /usuarios/me/limite` é chamado antes de `realizar_compra`
+2. **Validação de limite** — Coordenar com a task #8: `realizar_compra` lê `usuarios.limite_cents` diretamente do banco compartilhado; `GET /usuarios/me/limite` não participa da compra
+3. **Falha fechada** — Sem Bearer token retornar 401; se o MCP não puder validar o JWT, retornar 503 sem chamar o LLM
+4. **Sessão expirada** — Limpar a sessão local, redirecionar para `/login` e exibir uma mensagem
 
 ## Mudanças de arquivo
 
@@ -43,13 +45,14 @@ Implementação em duas frentes paralelas: backend (`api-auth/`) e frontend (`ch
 | `chat-web/src/app/login/page.tsx`         | criar     | Nova página de login                                                                               |
 | `chat-web/src/app/page.tsx`               | modificar | Gate client-side com useEffect                                                                     |
 | `chat-web/src/app/api/chat/route.ts`      | modificar | Passar header Authorization pro MCP                                                                |
+| `chat-web/src/lib/auth/`                  | criar     | Validar sessão local e testar a decisão fail-closed do chat                                         |
 | `chat-web/.env.example`                   | modificar | Adicionar `NEXT_PUBLIC_AUTH_URL`                                                                   |
 | `docs/adr/0004-authentication-jwt-cpf.md` | criar     | ADR registrando JWT sub=cpf, DEFAULT_LIMITE, compartilhamento de JWT_SECRET                        |
 
 ## Dependências externas
 
 - ✅ Task 0 (SQLite compartilhado): precisa estar em `develop` antes de começar
-- ⏳ Task B (mcp-server tools): vai consumir o endpoint `GET /usuarios/me/limite` (em paralelo, não bloqueante)
+- ✅ Tasks #7/#8 (MCP): validam identidade e limite diretamente no backend e no banco compartilhado
 
 ## Estimativa
 

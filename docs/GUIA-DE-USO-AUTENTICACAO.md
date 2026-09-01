@@ -66,7 +66,7 @@ Abra o navegador em **http://localhost:3000**.
 ## 4. O que acontece depois do login
 
 - O navegador grava um **token JWT** no `localStorage` (chave `chat_session`).
-- Esse token vale por **1 hora**. Depois disso, você é deslogado automaticamente e precisa logar de novo.
+- Esse token vale por **1 hora**. Na próxima mensagem enviada depois da expiração, a sessão local é removida e você volta para o login com um aviso.
 - Toda mensagem que você envia no chat leva esse token no header `Authorization: Bearer <token>`.
 - O backend (`api-auth`) e o `mcp-server` usam o mesmo `JWT_SECRET` pra validar o token — por isso o limite de gasto (R$ 1.000,00 padrão) é respeitado nas compras.
 

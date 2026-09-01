@@ -62,6 +62,16 @@ Marque cada item conforme completa. Não avance para o próximo bloco sem finali
 - [x] Teste: `GET /usuarios/me/limite` com JWT inválido → erro 401
 - [x] Cobertura: `npm run check` deve passar com ≥80% de cobertura de funções
 
+### Hardening pós-review
+
+- [x] Aceitar `DEFAULT_LIMITE_CENTS=0` e recusar configuração negativa, fracionária ou inválida
+- [x] Exigir `JWT_SECRET` explícito quando `NODE_ENV=production`
+- [x] Recusar JWT sem `sub` com 401
+- [x] Executar scrypt também quando o CPF não existe
+- [x] Remover `any` do tratamento de erro de constraint
+- [x] Cobrir configuração, token expirado, token sem `sub` e CORS com testes
+- [x] Rodar testes direto do TypeScript, sem gerar `dist/`
+
 ### Documentação
 
 - [x] Criar ADR em `docs/adr/0004-authentication-jwt-cpf.md` registrando:
@@ -109,31 +119,42 @@ Marque cada item conforme completa. Não avance para o próximo bloco sem finali
 
 - [x] Ler `Authorization` header: `request.headers.get('authorization')`
 - [x] Repassar pro MCP: `new StreamableHTTPClientTransport({ url, requestInit: { headers: { Authorization: authHeader } } })`
-- [x] Se sem header: retornar erro 401 (ou deixar vazio e MCP rejeita) — implementado deixando vazio e distinguindo, no catch, uma rejeição do MCP (`StreamableHTTPError` 401/403 → propaga o mesmo status) de qualquer outra falha (degrada sem tools). Ver Emenda em `spec.md`.
+- [x] Se sem Bearer token: retornar 401 antes de chamar o MCP
+- [x] Se o MCP recusar o token: propagar 401/403
+- [x] Se o MCP estiver indisponível: retornar 503 sem chamar o LLM
+- [x] Cobrir a decisão fail-closed com teste automatizado em `src/lib/auth/chat-access.check.ts`
 
 ### Testes manuais
 
-- [ ] Fluxo novo: cadastro → login → chat (token viaja no header)
-- [ ] Token expirado: editar localStorage pra token fake, enviar mensagem, verificar erro
-- [ ] Redirecionamento: entrar em `http://localhost:3000/` sem session → redireciona pra `/login`
-- [ ] Erro de CPF duplicado: tentar cadastrar 2x mesma pessoa → mensagem aparece
-- [ ] Erro de credenciais: login com senha errada → mensagem aparece
+- [x] Fluxo novo: cadastro → login → chat (token viaja no header)
+- [x] Token expirado: editar localStorage pra token fake, enviar mensagem, verificar erro
+- [x] Redirecionamento: entrar em `http://localhost:3000/` sem session → redireciona pra `/login`
+- [x] Erro de CPF duplicado: tentar cadastrar 2x mesma pessoa → mensagem aparece
+- [x] Erro de credenciais: login com senha errada → mensagem aparece
+
+### Regressões pós-review
+
+- [x] Sessão ausente, incompleta ou inválida é recusada pelo gate
+- [x] Resposta 401/403 limpa a sessão e redireciona para `/login` com mensagem
+- [x] MCP indisponível retorna 503 sem chamar o LLM
+- [x] Campos de senha permitem mostrar e ocultar o valor
 
 ---
 
 ## Integração + Validação
 
-- [ ] Conferir que ambos `api-auth` e `mcp-server` têm **idêntico** `JWT_SECRET` em `.env`
+- [x] Conferir que ambos `api-auth` e `mcp-server` têm **idêntico** `JWT_SECRET` em `.env`
 - [x] Rodar `npm run check` em `api-auth/` (testes + cobertura 80%)
 - [x] Rodar `npm run check` em `chat-web/` (lint + typecheck)
-- [ ] Testar ponta-a-ponta: usuário novo → cadastro → login → chat → enviar mensagem
+- [x] Rodar `npm run check` em `mcp-server/` após integrar com `develop`
+- [x] Testar ponta-a-ponta: usuário novo → cadastro → login → chat → enviar mensagem
 - [x] Coordenar com Task B: a task #8 (`realizar_compra`) **não** chama `GET /usuarios/me/limite` — lê `usuarios.limite_cents` direto da tabela compartilhada, reaproveitando a conexão de `db.ts` da task #7. Ver Emenda em `spec.md` e ADR 0004.
 
 ---
 
 ## Pronto pra PR?
 
-- [ ] Todos os itens acima estão marcados
-- [ ] Branch está atualizada com `develop` (sem conflitos)
-- [x] `npm run check` passa em ambos pacotes
-- [ ] Fluxo manual foi testado
+- [x] Todos os itens acima estão marcados
+- [x] Branch está atualizada com `develop` (sem conflitos)
+- [x] `npm run check` passa nos três pacotes
+- [x] Fluxo manual foi testado

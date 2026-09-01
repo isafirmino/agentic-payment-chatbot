@@ -2,6 +2,8 @@
 
 Chat em Next.js que conversa com um LLM, com streaming token a token e
 ferramentas vindas de um servidor MCP separado (`../mcp-server`).
+O acesso exige cadastro e login no `api-auth`; o JWT emitido viaja no header
+`Authorization` até o MCP, que valida assinatura, expiração e identidade.
 
 Dois provedores de LLM, escolhidos automaticamente (ver
 `docs/adr/0002-provedor-llm-ollama-com-fallback-openrouter.md`):
@@ -14,23 +16,22 @@ Essa escolha é feita **uma vez**, na primeira mensagem processada pelo
 servidor, e fica em cache pro resto do processo — reinicie `npm run dev`
 pra forçar uma nova checagem (ex.: depois de ligar o Ollama).
 
-São duas abas de conversa:
-
-- **Sem memória** — só a sua última mensagem é enviada. O modelo não faz ideia do que veio antes.
-- **Histórico completo** — todas as mensagens anteriores vão junto em cada requisição.
-
-Passe o mouse por cima de uma mensagem sua e um painel abre à direita mostrando **exatamente**
-o que foi enviado ao modelo naquele turno, incluindo o system prompt e as ferramentas que
-foram chamadas, com argumentos e retorno. Nada é salvo em cookie ou localStorage: o histórico
-vive só na memória da aba, e some ao recarregar a página.
+O histórico completo é enviado em todas as mensagens. Passe o mouse por
+cima de uma mensagem sua e um painel abre à direita mostrando **exatamente**
+o que foi enviado ao modelo naquele turno, incluindo o system prompt e as
+ferramentas chamadas, com argumentos e retorno. O histórico vive só na
+memória da aba; o `localStorage` guarda apenas a sessão autenticada.
 
 ## Como rodar
 
 ```bash
-# terminal 1 — as ferramentas (servidor MCP)
+# terminal 1 — autenticação
+cd ../api-auth && npm ci && npm run dev
+
+# terminal 2 — ferramentas autenticadas
 cd ../mcp-server && npm install && npm start
 
-# terminal 2 — o chat
+# terminal 3 — chat
 npm install
 cp .env.example .env   # preencha OPENROUTER_API_KEY se não for usar Ollama
 npm run dev
@@ -38,9 +39,10 @@ npm run dev
 
 Abra [http://localhost:3000](http://localhost:3000).
 
-Suba o servidor de ferramentas **antes** de conversar. Ollama é opcional —
-se não estiver rodando, o chat cai automaticamente pro OpenRouter (ver
-acima), desde que `OPENROUTER_API_KEY` esteja configurada.
+Use o mesmo `JWT_SECRET` nos `.env` de `api-auth` e `mcp-server`. Suba os
+dois serviços antes de conversar. Se o MCP estiver indisponível, o chat
+retorna 503 e não chama o LLM porque não consegue validar a sessão. Ollama é
+opcional: o OpenRouter assume se sua chave estiver configurada.
 
 ### Variáveis de ambiente
 
@@ -48,6 +50,7 @@ Copie `.env.example` pra `.env` (carregado automaticamente via `dotenv`).
 
 | Variável | Padrão | O que é |
 | --- | --- | --- |
+| `NEXT_PUBLIC_AUTH_URL` | `http://localhost:3001` | API usada pelas telas de cadastro e login. |
 | `OLLAMA_URL` | `http://localhost:11434` | Onde o Ollama escuta. |
 | `OLLAMA_MODEL` | `qwen2.5:14b` | Modelo usado no Ollama. Precisa suportar ferramentas. |
 | `MCP_URL` | `http://localhost:4000/mcp` | Servidor MCP com as ferramentas. |
@@ -111,8 +114,9 @@ body: JSON.stringify({ model: MODEL, messages: convo, tools, stream: true, keep_
 
 `src/app/api/chat/route.ts` é o único caminho até o modelo. Ele:
 
-1. Abre uma conexão MCP com o `mcp-server` e traduz as ferramentas pro
-   formato de function-calling (compatível com os dois provedores).
+1. Exige Bearer token, abre uma conexão autenticada com o `mcp-server` e
+   traduz as ferramentas pro formato de function-calling. Sem token retorna
+   401; sem MCP para validá-lo retorna 503, sem chamar o LLM.
 2. Chama `pickProvider()` (`src/lib/llm/index.ts`), que decide entre Ollama
    (`src/lib/llm/ollama.ts`) e OpenRouter (`src/lib/llm/openrouter.ts`) e
    repassa os tokens pro navegador em NDJSON, independente de qual dos

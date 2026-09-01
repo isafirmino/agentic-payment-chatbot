@@ -17,6 +17,12 @@ TTL de 1 hora, sem refresh token. Mesmo `JWT_SECRET` compartilhado entre
 `api-auth` e `mcp-server` via variável de ambiente, com o mesmo fallback de
 desenvolvimento documentado nos dois `.env.example`.
 
+O `chat-web` não recebe o segredo nem valida o JWT localmente: repassa o
+Bearer token ao `mcp-server`, que é a autoridade de autenticação nessa
+borda. Se o MCP estiver indisponível, `/api/chat` falha fechado com 503 e
+não chama o LLM. Em produção, tanto `api-auth` quanto `mcp-server` exigem
+`JWT_SECRET` explícito e recusam iniciar com o fallback de desenvolvimento.
+
 ## Alternativas consideradas
 
 - **JWT com role e limite embutidos no payload** — descartada porque o
@@ -41,6 +47,8 @@ desenvolvimento documentado nos dois `.env.example`.
   mecanismo usado pela validação de compra.
 - Token expirado força novo login; sem refresh, uma sessão de mais de 1 hora
   exige autenticar de novo.
+- Indisponibilidade do MCP também indisponibiliza o chat, porque liberar o
+  LLM sem conseguir validar o token violaria a barreira de autenticação.
 - Compartilhar `JWT_SECRET` entre os dois serviços exige manter os `.env`
   sincronizados; um segredo diferente entre eles faz a validação falhar
   silenciosamente (o serviço recusa o token com 401, sem lançar exceção

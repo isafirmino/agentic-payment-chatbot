@@ -17,9 +17,9 @@ npm run dev     # http://localhost:3001
 | Variável | Default | Descrição |
 |----------|---------|-----------|
 | `PORT` | `3001` | porta HTTP (3000 é do `chat-web`, por isso o default aqui é diferente) |
-| `JWT_SECRET` | `workshop-dev-secret-do-not-use-in-prod` | chave de assinatura. ⚠️ Compartilhada com o `mcp-server` — mude nos dois `.env` juntos. Trocar o secret invalida todos os tokens emitidos antes da mudança. |
+| `JWT_SECRET` | fallback apenas em desenvolvimento | chave de assinatura compartilhada com o `mcp-server`. Em produção é obrigatória; use o mesmo valor nos dois `.env`. Trocar o segredo invalida os tokens emitidos anteriormente. |
 | `DATABASE_PATH` | `../data/app.db` | banco SQLite compartilhado com o `mcp-server` — ver abaixo |
-| `DEFAULT_LIMITE_CENTS` | `100000` | limite de gasto (em centavos) atribuído a todo usuário novo. `100000` = R$ 1.000,00 |
+| `DEFAULT_LIMITE_CENTS` | `100000` | limite não negativo em centavos atribuído a todo usuário novo. Zero é aceito; valor negativo, fracionário ou inválido impede o boot. |
 | `CORS_ORIGIN` | `http://localhost:3000` | origem do `chat-web` liberada no CORS. Sem isso (ou com valor errado), o navegador bloqueia `fetch` de `/auth/cadastro` e `/auth/login` com `Failed to fetch`, mesmo com o backend respondendo certo. |
 
 Tokens expiram em **1h** (`expiresIn` vem na resposta do login). Não há
