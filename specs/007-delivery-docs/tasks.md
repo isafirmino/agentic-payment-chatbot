@@ -12,10 +12,10 @@
 
 ## Roteiro de teste manual
 
-- [ ] Criar `docs/teste-manual.md` com pré-requisitos e ordem de subida dos serviços
-- [ ] Descrever a sessão contínua com dados exatos e saldo esperado a cada passo
-- [ ] Indicar em cada passo qual captura ele gera e o que precisa estar visível
-- [ ] Acrescentar a seção final com os três prompts de jailbreak
+- [x] Criar `docs/teste-manual.md` com pré-requisitos e ordem de subida dos serviços
+- [x] Descrever a sessão contínua com dados exatos e saldo esperado a cada passo
+- [x] Indicar em cada passo qual captura ele gera e o que precisa estar visível
+- [x] Acrescentar a seção final com os três prompts de jailbreak
 
 ## README da raiz
 
