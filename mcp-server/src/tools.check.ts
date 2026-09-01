@@ -93,8 +93,8 @@ test('generateIntentionId usa o formato int_ com seis caracteres hexadecimais', 
   assert.match(generateIntentionId(), /^int_[0-9a-f]{6}$/)
 })
 
-test('generateTransactionId usa o formato tx_ com seis caracteres hexadecimais', () => {
-  assert.match(generateTransactionId(), /^tx_[0-9a-f]{6}$/)
+test('generateTransactionId usa o formato tx_ com dezesseis caracteres hexadecimais', () => {
+  assert.match(generateTransactionId(), /^tx_[0-9a-f]{16}$/)
 })
 
 test('registrarIntencao calcula e persiste valor, proprietario e validade no backend', () => {
@@ -153,7 +153,7 @@ test('realizarCompra aprova cartao e persiste todos os efeitos atomicos', () => 
 
   assert.equal(result.status, 'aprovado')
   assert.ok('transacao_id' in result)
-  assert.match(result.transacao_id, /^tx_[0-9a-f]{6}$/)
+  assert.match(result.transacao_id, /^tx_[0-9a-f]{16}$/)
   assert.deepEqual(result, {
     status: 'aprovado',
     transacao_id: result.transacao_id,
@@ -246,6 +246,18 @@ test('realizarCompra recusa intencao expirada e aceita no instante exato da expi
   )
 })
 
+test('realizarCompra falha fechado se a data de expiracao estiver corrompida', () => {
+  const db = setupDb()
+  const intentionId = createIntention(db)
+  db.prepare(`UPDATE intencoes SET expira_em = 'data-invalida' WHERE id = ?`).run(intentionId)
+
+  assert.equal(
+    purchaseErrorCode(realizarCompra(db, OWNER_CPF, { intencao_id: intentionId, metodo_pagamento: 'pix' }, NOW)),
+    'INTENCAO_EXPIRADA',
+  )
+  assert.equal((db.prepare(`SELECT COUNT(*) AS total FROM transacoes`).get() as { total: number }).total, 0)
+})
+
 test('realizarCompra recusa metodo diferente da grafia exata contratada', () => {
   for (const method of ['credito', 'PIX', ' pix ', '', 1]) {
     const db = setupDb()
@@ -316,17 +328,40 @@ test('realizarCompra traduz UNIQUE de intencao e reverte os demais efeitos', () 
   assert.equal((db.prepare(`SELECT COUNT(*) AS total FROM transacoes`).get() as { total: number }).total, 1)
 })
 
-test('realizarCompra reverte a insercao se a atualizacao de estoque falhar', () => {
+test('realizarCompra invalida a intencao se o estoque acabar antes do pagamento', () => {
   const db = setupDb()
   const intentionId = createIntention(db)
   db.prepare(`UPDATE produtos SET estoque = 0 WHERE id = 'prod_001'`).run()
 
-  assert.throws(
-    () => realizarCompra(db, OWNER_CPF, { intencao_id: intentionId, metodo_pagamento: 'pix' }, NOW),
-    /CHECK constraint failed/,
-  )
+  const refused = realizarCompra(db, OWNER_CPF, { intencao_id: intentionId, metodo_pagamento: 'pix' }, NOW)
+  assert.equal(purchaseErrorCode(refused), 'INTENCAO_INVALIDA')
+  assert.match((refused as PurchaseRejected).mensagem, /estoque.*nova intenção/i)
   assert.equal((db.prepare(`SELECT COUNT(*) AS total FROM transacoes`).get() as { total: number }).total, 0)
-  assert.equal((db.prepare(`SELECT status FROM intencoes WHERE id = ?`).get(intentionId) as { status: string }).status, 'pendente')
+  assert.equal(
+    (db.prepare(`SELECT status FROM intencoes WHERE id = ?`).get(intentionId) as { status: string }).status,
+    'cancelada_estoque',
+  )
+  assert.equal(
+    purchaseErrorCode(realizarCompra(db, OWNER_CPF, { intencao_id: intentionId, metodo_pagamento: 'pix' }, NOW)),
+    'INTENCAO_INVALIDA',
+  )
+})
+
+test('realizarCompra trata estoque esgotado por duas intencoes sequenciais', () => {
+  const db = setupDb()
+  const firstId = createIntention(db, { productId: 'prod_004', quantity: 5 })
+  const secondId = createIntention(db, { productId: 'prod_004', quantity: 5 })
+
+  assert.equal(
+    realizarCompra(db, OWNER_CPF, { intencao_id: firstId, metodo_pagamento: 'pix' }, NOW).status,
+    'aprovado',
+  )
+  assert.equal(
+    purchaseErrorCode(realizarCompra(db, OWNER_CPF, { intencao_id: secondId, metodo_pagamento: 'pix' }, NOW)),
+    'INTENCAO_INVALIDA',
+  )
+  assert.equal((db.prepare(`SELECT estoque FROM produtos WHERE id = 'prod_004'`).get() as { estoque: number }).estoque, 0)
+  assert.equal((db.prepare(`SELECT COUNT(*) AS total FROM transacoes`).get() as { total: number }).total, 1)
 })
 
 test('duas compras concorrentes aprovam a intencao apenas uma vez', async (t) => {
@@ -366,6 +401,7 @@ test('duas compras concorrentes aprovam a intencao apenas uma vez', async (t) =>
   assert.deepEqual(statuses, ['INTENCAO_JA_PAGA', 'aprovado'])
 
   const verificationDb = new DatabaseSync(databasePath)
+  verificationDb.exec('PRAGMA busy_timeout = 5000')
   assert.equal((verificationDb.prepare(`SELECT COUNT(*) AS total FROM transacoes`).get() as { total: number }).total, 1)
   assert.equal((verificationDb.prepare(`SELECT estoque FROM produtos WHERE id = 'prod_001'`).get() as { estoque: number }).estoque, 19)
   assert.equal((verificationDb.prepare(`SELECT status FROM intencoes WHERE id = ?`).get(intentionId) as { status: string }).status, 'paga')

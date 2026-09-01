@@ -24,6 +24,9 @@ type IntentionRow = {
 }
 type UserLimitRow = { limite_cents: number }
 type TotalSpentRow = { total_cents: number }
+type StockRow = { estoque: number }
+
+const STOCK_UNAVAILABLE_STATUS = 'cancelada_estoque'
 
 function rejected(erro: Rejected['erro'], mensagem: string): Rejected {
   return { status: 'recusado', erro, mensagem }
@@ -42,7 +45,7 @@ export function generateIntentionId(): string {
 }
 
 export function generateTransactionId(): string {
-  return `tx_${randomBytes(3).toString('hex')}`
+  return `tx_${randomBytes(8).toString('hex')}`
 }
 
 export function listarCatalogo(db: DatabaseSync, args: { categoria?: unknown }) {
@@ -133,10 +136,14 @@ export function realizarCompra(
     if (!intention || !user) {
       return refuse('INTENCAO_INVALIDA', 'Intenção inválida para o usuário autenticado.')
     }
+    if (intention.status === STOCK_UNAVAILABLE_STATUS) {
+      return refuse('INTENCAO_INVALIDA', 'O estoque desta intenção não está mais disponível. Registre uma nova intenção.')
+    }
     if (intention.status !== 'pendente') {
       return refuse('INTENCAO_JA_PAGA', 'Esta intenção de compra já foi utilizada.')
     }
-    if (now.getTime() > new Date(intention.expira_em).getTime()) {
+    const expiresAt = new Date(intention.expira_em).getTime()
+    if (!Number.isFinite(expiresAt) || now.getTime() > expiresAt) {
       return refuse('INTENCAO_EXPIRADA', 'Esta intenção de compra expirou. Registre uma nova intenção.')
     }
 
@@ -152,6 +159,19 @@ export function realizarCompra(
     const remainingBeforePurchaseCents = user.limite_cents - totalSpentCents
     if (intention.valor_total_cents > remainingBeforePurchaseCents) {
       return refuse('LIMITE_EXCEDIDO', 'O valor da compra excede o limite restante.')
+    }
+
+    const product = db.prepare(`SELECT estoque FROM produtos WHERE id = ?`).get(intention.produto_id) as
+      | StockRow
+      | undefined
+    if (!product || product.estoque < intention.quantidade) {
+      db.prepare(`UPDATE intencoes SET status = ? WHERE id = ?`).run(STOCK_UNAVAILABLE_STATUS, intention.id)
+      db.exec('COMMIT')
+      transactionOpen = false
+      return purchaseRejected(
+        'INTENCAO_INVALIDA',
+        'O estoque desta intenção não está mais disponível. Registre uma nova intenção.',
+      )
     }
 
     const transactionId = generateTransactionId()
