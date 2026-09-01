@@ -6,7 +6,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { resolveCpf, resolveJwtSecret, Unauthorized } from './auth.ts'
 import { getDb } from './db.ts'
 import { bootstrapSchema, seedProducts } from './schema.ts'
-import { listarCatalogo, registrarIntencao } from './tools.ts'
+import { listarCatalogo, realizarCompra, registrarIntencao } from './tools.ts'
 
 const PORT = Number(process.env.PORT ?? 4000)
 const JWT_SECRET = resolveJwtSecret()
@@ -22,7 +22,7 @@ function json(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value) }] }
 }
 
-const mcp = new McpServer({ name: 'catalog-purchase-intent', version: '1.0.0' })
+const mcp = new McpServer({ name: 'agentic-payment', version: '1.0.0' })
 
 mcp.registerTool(
   'listar_catalogo',
@@ -48,6 +48,19 @@ mcp.registerTool(
     json(registrarIntencao(getDb(), currentCpf(), { produto_id, quantidade })),
 )
 
+mcp.registerTool(
+  'realizar_compra',
+  {
+    description: 'Confirma o pagamento de uma intenção pendente usando cartão ou pix.',
+    inputSchema: {
+      intencao_id: z.string().describe('Identificador retornado por registrar_intencao.'),
+      metodo_pagamento: z.string().describe('Método de pagamento: cartao ou pix.'),
+    },
+  },
+  async ({ intencao_id, metodo_pagamento }) =>
+    json(realizarCompra(getDb(), currentCpf(), { intencao_id, metodo_pagamento })),
+)
+
 const app = express()
 app.use(express.json())
 
@@ -70,4 +83,4 @@ const db = getDb()
 bootstrapSchema(db)
 seedProducts(db)
 
-app.listen(PORT, () => console.log(`catalog-purchase-intent (MCP) on http://localhost:${PORT}/mcp`))
+app.listen(PORT, () => console.log(`agentic-payment (MCP) on http://localhost:${PORT}/mcp`))
