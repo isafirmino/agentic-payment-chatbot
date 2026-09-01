@@ -164,7 +164,7 @@ cumprida.
 | Servidor MCP com as 3 tools expostas e descobertas pelo agente | `mcp-server` via Streamable HTTP | Painel de ferramentas em todas as capturas |
 | Tools respeitam os contratos de argumentos e retorno | `mcp-server/src/tools.ts` | [ADR 0005](docs/adr/0005-contrato-catalogo-e-intencao.md) · [ADR 0006](docs/adr/0006-compra-atomica-e-limite-acumulado.md) |
 | Compra concluída com `cartao` **e** com `pix` | `realizar_compra` | 📸 1 e 2 |
-| `realizar_compra` exige `intencao_id` válido e recusa id inventado | Intenção buscada por `id` **e** `owner_cpf` | 📸 4 (agente recusa) · 📸 7 (backend recusa) |
+| `realizar_compra` exige `intencao_id` válido e recusa id inventado | Intenção buscada por `id` **e** `owner_cpf` | 📸 4 (agente recusa) · evidência 7 (backend recusa) |
 | Tentativa acima do limite retorna erro | `LIMITE_EXCEDIDO` antes de qualquer efeito | 📸 3 |
 | Limite armazenado e validado no backend | `usuarios.limite_cents` no SQLite; recalculado a cada compra | [ADR 0006](docs/adr/0006-compra-atomica-e-limite-acumulado.md) · 📸 3 |
 | Histórico completo enviado ao modelo a cada turno | `chat-web/src/lib/chat/payload.ts`, incluindo chamadas de tool e resultados | Painel "Enviado ao modelo" em todas as capturas |

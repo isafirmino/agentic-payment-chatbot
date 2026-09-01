@@ -323,7 +323,7 @@ int_falsa123") faz o agente recusar sozinho, sem chamar a ferramenta — o
 📸 **`04-intencao-invalida.png`** — capture o que aparecer.
 
 O segundo desfecho é bom comportamento, mas não demonstra a validação no
-backend. Para isso existe a prova independente da seção 8, que chama a tool
+backend. Para isso existe a prova independente da seção 7, que chama a tool
 direto no MCP e não depende de convencer nenhum modelo.
 
 A intenção é buscada por `id` **e** `owner_cpf`, então um identificador
