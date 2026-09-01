@@ -1,6 +1,9 @@
 import "dotenv/config";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPError,
+} from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { pickProvider } from "@/lib/llm";
 import type { Message, ProviderTool, ToolCall } from "@/lib/llm/types";
 
@@ -70,7 +73,13 @@ export async function POST(request: Request) {
   try {
     client = await connect(authHeader);
     tools = toProviderTools((await client.listTools()).tools);
-  } catch {
+  } catch (err) {
+    // 401/403: o MCP recusou a autenticação — não é caso de degradar sem
+    // tools, é caso de negar acesso ao chat (ver specs/004-authentication).
+    if (err instanceof StreamableHTTPError && (err.code === 401 || err.code === 403)) {
+      return Response.json({ error: "unauthorized" }, { status: err.code });
+    }
+    // qualquer outro erro (MCP fora do ar, rede) degrada pra chat sem tools
     client = undefined;
   }
 
