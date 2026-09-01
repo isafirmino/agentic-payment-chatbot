@@ -152,6 +152,20 @@ Salve as imagens em `docs/screenshots/` com os nomes indicados em cada passo.
 Converse em linguagem natural. Os textos abaixo são sugestões — o que importa
 é o resultado e o que aparece no painel.
 
+> **Peça em dois turnos: escolher o produto, depois autorizar o pagamento.**
+> É o fluxo que o próprio desafio descreve ("Quero o item 3" → "Pode pagar no
+> pix") e o que modelos menores seguem de forma confiável. Um pedido composto
+> — "compre X pagando no cartão" — costuma fazer um modelo de 7B parar depois
+> de registrar a intenção, ou nem chamar as ferramentas.
+>
+> A captura sai sempre do **segundo** turno, o da autorização: é nele que a
+> caixa âmbar do `realizar_compra` aparece.
+
+> **Só clique para fixar o painel depois que o agente terminar de responder.**
+> As caixas âmbar são preenchidas conforme as ferramentas são chamadas; se
+> você abrir o painel durante a digitação da resposta, verá apenas o histórico
+> enviado, ainda sem nenhuma ferramenta.
+
 ### Passo 1 — Catálogo
 
 > Quais produtos você tem disponíveis?
@@ -172,10 +186,18 @@ Sem captura.
 
 ### Passo 2 — 📸 Compra aprovada com cartão
 
-> Quero comprar 1 Fone Bluetooth pagando com cartão.
+**Turno 1:**
 
-Esperado: `registrar_intencao` seguido de `realizar_compra`. O painel deve
-mostrar as duas chamadas, e o retorno da compra com:
+> Quero comprar 1 Fone Bluetooth.
+
+O agente chama `registrar_intencao` e informa o prazo de confirmação. Sem
+captura.
+
+**Turno 2:**
+
+> Pode pagar no cartão.
+
+Agora ele chama `realizar_compra`, e o retorno traz:
 
 ```
 status: "aprovado"
@@ -184,18 +206,21 @@ metodo_pagamento: "cartao"
 limite_restante: 750.1
 ```
 
-📸 **`01-compra-aprovada-cartao.png`** — painel fixado, com o
-`realizar_compra` visível e o `limite_restante` legível.
-
-> Se o agente registrar a intenção mas não concluir o pagamento, responda
-> "pode confirmar a compra" no turno seguinte. O `intencao_id` é gerado pelo
-> backend e sempre precisa das duas chamadas, nessa ordem.
+📸 **`01-compra-aprovada-cartao.png`** — clique na mensagem *"Pode pagar no
+cartão."* para fixar o painel, com o `realizar_compra` e o `limite_restante`
+legíveis.
 
 ---
 
 ### Passo 3 — 📸 Compra aprovada com pix
 
-> Agora quero 1 Mochila pra Notebook, dessa vez no pix.
+**Turno 1:**
+
+> Agora quero 1 Mochila pra Notebook.
+
+**Turno 2:**
+
+> Pode pagar no pix.
 
 Esperado:
 
@@ -217,7 +242,13 @@ próximo passo não vai funcionar como descrito.
 
 ### Passo 4 — 📸 Limite excedido
 
-> Quero comprar 1 Cadeira Gamer no cartão.
+**Turno 1:**
+
+> Quero comprar 1 Cadeira Gamer.
+
+**Turno 2:**
+
+> Pode pagar no cartão.
 
 Esperado: a intenção é registrada normalmente (registrar não move dinheiro) e
 o pagamento é recusado:
