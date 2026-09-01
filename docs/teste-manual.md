@@ -154,9 +154,28 @@ Converse em linguagem natural. Os textos abaixo são sugestões — o que import
 
 > **Peça em dois turnos: escolher o produto, depois autorizar o pagamento.**
 > É o fluxo que o próprio desafio descreve ("Quero o item 3" → "Pode pagar no
-> pix") e o que modelos menores seguem de forma confiável. Um pedido composto
-> — "compre X pagando no cartão" — costuma fazer um modelo de 7B parar depois
-> de registrar a intenção, ou nem chamar as ferramentas.
+> pix"). Um pedido composto — "compre X pagando no cartão" — faz o modelo de
+> 7B parar depois de registrar a intenção.
+>
+> **Use exatamente `Sim, confirmo. Pague no <método>.`** no turno de
+> autorização. O `qwen2.5:7b` exige uma confirmação afirmativa explícita antes
+> de chamar `realizar_compra`; sem ela, ele fica pedindo confirmação
+> indefinidamente e nenhuma compra acontece. Medido com 4 repetições por
+> frase, contra o system prompt e as tools reais:
+>
+> | Frase de autorização | Chamou `realizar_compra` |
+> |---|---|
+> | `Sim, confirmo. Pague no cartão.` | **4/4** |
+> | `Sim, confirmo. Pague no pix.` | **4/4** |
+> | `Sim. Pague no cartão.` | 1/4 |
+> | `Pode pagar no cartão.` | 0/4 |
+> | `Finalize a compra no cartão.` | 0/4 |
+> | `Confirme` | 0/4 |
+>
+> Isso é limitação do modelo de 7B, não do backend: a ordem
+> `registrar_intencao` → `realizar_compra` é exigida pelo servidor, e o
+> `system prompt` manda perguntar o método antes de pagar. Um modelo maior
+> tolera frases mais soltas.
 >
 > A captura sai sempre do **segundo** turno, o da autorização: é nele que a
 > caixa âmbar do `realizar_compra` aparece.
@@ -195,7 +214,7 @@ captura.
 
 **Turno 2:**
 
-> Pode pagar no cartão.
+> Sim, confirmo. Pague no cartão.
 
 Agora ele chama `realizar_compra`, e o retorno traz:
 
@@ -206,7 +225,7 @@ metodo_pagamento: "cartao"
 limite_restante: 750.1
 ```
 
-📸 **`01-compra-aprovada-cartao.png`** — clique na mensagem *"Pode pagar no
+📸 **`01-compra-aprovada-cartao.png`** — clique na mensagem *"Sim, confirmo. Pague no
 cartão."* para fixar o painel, com o `realizar_compra` e o `limite_restante`
 legíveis.
 
@@ -220,7 +239,7 @@ legíveis.
 
 **Turno 2:**
 
-> Pode pagar no pix.
+> Sim, confirmo. Pague no pix.
 
 Esperado:
 
@@ -248,7 +267,7 @@ próximo passo não vai funcionar como descrito.
 
 **Turno 2:**
 
-> Pode pagar no cartão.
+> Sim, confirmo. Pague no cartão.
 
 Esperado: a intenção é registrada normalmente (registrar não move dinheiro) e
 o pagamento é recusado:
