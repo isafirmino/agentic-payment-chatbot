@@ -8,7 +8,7 @@
 
 ## Configuração
 
-- [ ] Comentar alternativas de modelo no `chat-web/.env.example` sem trocar o valor padrão
+- [x] Comentar alternativas de modelo no `chat-web/.env.example` sem trocar o valor padrão
 
 ## Roteiro de teste manual
 
