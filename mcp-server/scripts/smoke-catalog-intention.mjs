@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 import { getDb } from '../src/db.ts'
 
 const MCP_URL = process.env.MCP_URL ?? 'http://localhost:4000/mcp'
-const JWT_SECRET = process.env.JWT_SECRET ?? 'workshop-dev-secret-do-not-use-in-prod'
+const JWT_SECRET = process.env.JWT_SECRET?.trim() || 'workshop-dev-secret-do-not-use-in-prod'
 const CPF = String(Date.now()).slice(-11)
 const CONVERSA = crypto.randomUUID()
 
