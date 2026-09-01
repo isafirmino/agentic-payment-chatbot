@@ -1,0 +1,213 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import jwt from 'jsonwebtoken'
+import { getDb } from '../src/db.ts'
+
+const MCP_URL = process.env.MCP_URL ?? 'http://localhost:4000/mcp'
+const JWT_SECRET = process.env.JWT_SECRET?.trim() || 'workshop-dev-secret-do-not-use-in-prod'
+const CPF = String(Date.now()).slice(-11)
+const CONVERSA = crypto.randomUUID()
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message)
+}
+
+function parse(result) {
+  const text = result.content?.find(({ type }) => type === 'text')?.text
+  if (!text) throw new Error('tool returned no text content')
+  return JSON.parse(text)
+}
+
+function cleanupSmokeData(db) {
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    const purchases = db.prepare(
+      `SELECT intencoes.produto_id, intencoes.quantidade
+       FROM transacoes
+       JOIN intencoes ON intencoes.id = transacoes.intencao_id
+       WHERE transacoes.owner_cpf = ?`,
+    ).all(CPF)
+    for (const purchase of purchases) {
+      db.prepare(`UPDATE produtos SET estoque = estoque + ? WHERE id = ?`).run(
+        purchase.quantidade,
+        purchase.produto_id,
+      )
+    }
+    db.prepare(`DELETE FROM transacoes WHERE owner_cpf = ?`).run(CPF)
+    db.prepare(`DELETE FROM intencoes WHERE owner_cpf = ?`).run(CPF)
+    db.prepare(`DELETE FROM chamadas_tool WHERE owner_cpf = ?`).run(CPF)
+    db.prepare(`DELETE FROM usuarios WHERE cpf = ?`).run(CPF)
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
+}
+
+async function main() {
+  const db = getDb()
+  // Fixture do smoke apenas: o bootstrap da tabela continua pertencendo ao
+  // api-auth, e o servidor MCP não a cria durante a inicialização normal.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS usuarios (
+      cpf TEXT PRIMARY KEY,
+      nome TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      limite_cents INTEGER NOT NULL DEFAULT 100000
+    )
+  `)
+  db.prepare(
+    `INSERT INTO usuarios (cpf, nome, password_hash, limite_cents)
+     VALUES (?, 'Smoke Task 8', 'smoke:not-a-login', 100000)`,
+  ).run(CPF)
+
+  let transport
+  try {
+    const unauthorized = await fetch(MCP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
+    })
+    assert(unauthorized.status === 401, `expected HTTP 401, received ${unauthorized.status}`)
+
+    const token = jwt.sign({}, JWT_SECRET, { subject: CPF, expiresIn: '1h', algorithm: 'HS256' })
+    transport = new StreamableHTTPClientTransport(new URL(MCP_URL), {
+      requestInit: {
+        headers: { Authorization: `Bearer ${token}`, 'X-Conversa-Id': CONVERSA },
+      },
+    })
+    const client = new Client({ name: 'purchase-payment-smoke', version: '1.0.0' })
+    await client.connect(transport)
+
+    const tools = await client.listTools()
+    assert(
+      tools.tools.map(({ name }) => name).join(',') === 'listar_catalogo,registrar_intencao,realizar_compra',
+      'unexpected tools',
+    )
+
+    const catalog = parse(await client.callTool({ name: 'listar_catalogo', arguments: { categoria: 'audio' } }))
+    assert(catalog.produtos.length === 1 && catalog.produtos[0].preco === 249.9, 'unexpected catalog')
+
+    const intention = parse(await client.callTool({
+      name: 'registrar_intencao',
+      arguments: { produto_id: 'prod_001', quantidade: 2 },
+    }))
+    assert(intention.valor_total === 499.8, 'unexpected intention total')
+    assert(intention.valido_por_minutos === 5, 'unexpected intention validity')
+
+    const rejected = parse(await client.callTool({
+      name: 'registrar_intencao',
+      arguments: { produto_id: 'prod_004', quantidade: 6 },
+    }))
+    assert(rejected.erro === 'ESTOQUE_INSUFICIENTE', 'expected ESTOQUE_INSUFICIENTE')
+
+    const purchase = parse(await client.callTool({
+      name: 'realizar_compra',
+      arguments: { intencao_id: intention.intencao_id, metodo_pagamento: 'pix' },
+    }))
+    assert(purchase.status === 'aprovado', 'expected approved purchase')
+    assert(purchase.intencao_id === intention.intencao_id, 'unexpected purchase intention')
+    assert(purchase.valor === 499.8, 'unexpected purchase value')
+    assert(purchase.metodo_pagamento === 'pix', 'unexpected payment method')
+    assert(purchase.limite_restante === 500.2, 'unexpected remaining limit')
+
+    // O inputSchema é o contrato anunciado ao modelo, e é a única barreira que
+    // os testes unitários não alcançam: eles chamam as funções direto, sem
+    // passar pelo protocolo. Sem isto, afrouxar um schema não quebraria nada.
+    // A violação de schema volta como resultado de erro da tool, não como
+    // exceção: o callTool resolve normalmente e marca isError.
+    const recusadoPeloSchema = async (name, args, motivo) => {
+      const saida = await client.callTool({ name, arguments: args })
+      const texto = saida.content?.find(({ type }) => type === 'text')?.text ?? ''
+      assert(saida.isError === true, `${motivo}: o schema aceitou ${JSON.stringify(args)}`)
+      assert(
+        /Invalid arguments/i.test(texto),
+        `${motivo}: recusado, mas não pelo schema — ${texto.slice(0, 80)}`,
+      )
+    }
+
+    await recusadoPeloSchema(
+      'registrar_intencao',
+      { produto_id: 'prod_001', quantidade: 1.5 },
+      'quantidade fracionária',
+    )
+    await recusadoPeloSchema(
+      'registrar_intencao',
+      { produto_id: 'prod_001', quantidade: 0 },
+      'quantidade zero',
+    )
+    await recusadoPeloSchema(
+      'realizar_compra',
+      { intencao_id: 'int_qualquer', metodo_pagamento: 'boleto' },
+      'método fora do enum',
+    )
+
+    // A exigência do cabeçalho vive no handler HTTP, que os testes de unidade
+    // não alcançam — eles chamam as funções direto. Sem isto, remover a
+    // exigência não quebraria nenhum teste.
+    const semConversa = new Client({ name: 'sem-conversa-smoke', version: '1.0.0' })
+    const transporteSemConversa = new StreamableHTTPClientTransport(new URL(MCP_URL), {
+      requestInit: { headers: { Authorization: `Bearer ${token}` } },
+    })
+    try {
+      await semConversa.connect(transporteSemConversa)
+
+      // Catálogo não cria nem consome intenção: continua livre.
+      const catalogoLivre = parse(
+        await semConversa.callTool({ name: 'listar_catalogo', arguments: {} }),
+      )
+      assert(catalogoLivre.produtos.length === 5, 'catalog should not require a conversation')
+
+      for (const [name, args] of [
+        ['registrar_intencao', { produto_id: 'prod_001', quantidade: 1 }],
+        ['realizar_compra', { intencao_id: 'int_qualquer', metodo_pagamento: 'pix' }],
+      ]) {
+        const saida = await semConversa.callTool({ name, arguments: args })
+        assert(saida.isError === true, `${name} aceitou chamada sem X-Conversa-Id`)
+      }
+    } finally {
+      await transporteSemConversa.close()
+    }
+
+    // O envelope de auditoria vive no server.ts, entre o protocolo e as tools.
+    // Os testes de unidade chamam as funções direto, então nunca passam por
+    // ele: sem esta conferência, remover o envelope não quebraria nada.
+    const registradas = db
+      .prepare(`SELECT tool, desfecho FROM chamadas_tool WHERE owner_cpf = ? ORDER BY id`)
+      .all(CPF)
+
+    assert(registradas.length >= 4, `log deveria ter as chamadas desta sessão, tem ${registradas.length}`)
+    assert(
+      registradas.some((c) => c.tool === 'listar_catalogo' && c.desfecho === 'consultado'),
+      'catálogo não foi registrado',
+    )
+    assert(
+      registradas.some((c) => c.tool === 'realizar_compra' && c.desfecho === 'aprovado'),
+      'compra aprovada não foi registrada',
+    )
+    // A recusa é o que distingue este log da tabela transacoes.
+    assert(
+      registradas.some((c) => c.tool === 'registrar_intencao' && c.desfecho === 'ESTOQUE_INSUFICIENTE'),
+      'recusa por estoque não foi registrada',
+    )
+    // Chamada barrada pelo schema não chega ao envelope, por decisão registrada
+    // no ADR 0008 — ela não executou nada.
+    assert(
+      !registradas.some((c) => c.desfecho === 'desconhecido'),
+      'chamada barrada pelo schema não deveria aparecer no log',
+    )
+
+    console.log(
+      '✔ Smoke test OK — auth, conversation, discovery, catalog, intention, purchase, schemas and audit passed.',
+    )
+  } finally {
+    await transport?.close()
+    cleanupSmokeData(db)
+    db.close()
+  }
+}
+
+main().catch((error) => {
+  console.error('✘ Smoke test failed:', error.message)
+  process.exitCode = 1
+})

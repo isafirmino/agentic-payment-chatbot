@@ -1,47 +1,159 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import express from 'express'
 import { z } from 'zod'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
-import { DEFAULT_TZ, getTime, listItems } from './tools.ts'
+import { CONVERSA_HEADER, resolveConversaId, resolveCpf, resolveJwtSecret, Unauthorized } from './auth.ts'
+import { registrarChamada } from './audit.ts'
+import { getDb } from './db.ts'
+import { bootstrapSchema, seedProducts } from './schema.ts'
+import { listarCatalogo, realizarCompra, registrarIntencao } from './tools.ts'
 
 const PORT = Number(process.env.PORT ?? 4000)
+const JWT_SECRET = resolveJwtSecret()
+const requestIdentity = new AsyncLocalStorage<{ cpf: string; conversaId?: string }>()
 
-const mcp = new McpServer({ name: 'ollama-tools', version: '1.0.0' })
+function currentCpf(): string {
+  const identity = requestIdentity.getStore()
+  if (!identity) throw new Error('missing authenticated request context')
+  return identity.cpf
+}
 
-mcp.registerTool(
-  'get_time',
-  {
-    description: `Data e hora atuais. Já retorna no horário de Brasília (UTC-3) por padrão.`,
-    inputSchema: {
-      timezone: z.string().optional().describe(`Fuso IANA, ex.: America/Sao_Paulo. Padrão: ${DEFAULT_TZ}.`),
-    },
-  },
-  async ({ timezone }) => json(getTime({ timezone }))
-)
-
-mcp.registerTool(
-  'list_items',
-  {
-    description: 'Lista os itens à venda e seus preços em reais. Opcionalmente filtra por nome.',
-    inputSchema: {
-      search: z.string().optional().describe('Trecho do nome do item, sem diferenciar maiúsculas.'),
-    },
-  },
-  async ({ search }) => json(listItems({ search }))
-)
+/**
+ * Exigido pelas tools que criam ou consomem intenção. Lança quando o cabeçalho
+ * não veio: sem conversa não há como amarrar a intenção, e aceitar a chamada
+ * transformaria a proteção em opcional — bastaria omitir o cabeçalho. Ver
+ * ADR 0007.
+ */
+function currentConversaId(): string {
+  const identity = requestIdentity.getStore()
+  if (!identity) throw new Error('missing authenticated request context')
+  if (!identity.conversaId) throw new Unauthorized('missing conversation id')
+  return identity.conversaId
+}
 
 function json(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value) }] }
 }
 
+/**
+ * Embrulha o corpo de uma tool para registrá-la no log de auditoria.
+ *
+ * Aplicado no ponto de declaração, e não dentro de cada tool, por dois
+ * motivos: fica num lugar só, e uma tool nova nasce auditada sem ninguém
+ * precisar lembrar disso.
+ *
+ * Roda o corpo, grava, e devolve o resultado SEM tocar nele. Se o corpo
+ * lançar, registra o desfecho e relança — auditoria não engole exceção.
+ * Ver ADR 0008.
+ */
+function auditada<Args>(tool: string, corpo: (args: Args) => unknown) {
+  return async (args: Args) => {
+    const cpf = currentCpf()
+    try {
+      const resultado = corpo(args)
+      registrarChamada(getDb(), { tool, ownerCpf: cpf, argumentos: args, resultado })
+      return json(resultado)
+    } catch (erro) {
+      registrarChamada(getDb(), {
+        tool,
+        ownerCpf: cpf,
+        argumentos: args,
+        resultado: { erro: 'EXCECAO', mensagem: String(erro) },
+      })
+      throw erro
+    }
+  }
+}
+
+const mcp = new McpServer({ name: 'agentic-payment', version: '1.0.0' })
+
+mcp.registerTool(
+  'listar_catalogo',
+  {
+    description: 'Lista os produtos disponíveis, opcionalmente filtrados por categoria.',
+    inputSchema: {
+      categoria: z.string().optional().describe('Categoria opcional, por exemplo: monitores.'),
+    },
+  },
+  auditada('listar_catalogo', ({ categoria }: { categoria?: string }) =>
+    listarCatalogo(getDb(), { categoria }),
+  ),
+)
+
+mcp.registerTool(
+  'registrar_intencao',
+  {
+    description: 'Registra por cinco minutos a intenção de comprar um produto. Não realiza pagamento.',
+    inputSchema: {
+      produto_id: z.string().describe('Identificador de um produto do catálogo.'),
+      // int().positive() em vez de number(): o inputSchema é o contrato que o
+      // modelo recebe na descoberta, então restringir aqui evita a chamada
+      // errada em vez de só recusá-la depois. O backend continua validando —
+      // o schema orienta, não protege.
+      quantidade: z.number().int().positive().describe('Quantidade desejada, inteiro maior que zero.'),
+    },
+  },
+  auditada(
+    'registrar_intencao',
+    ({ produto_id, quantidade }: { produto_id: string; quantidade: number }) =>
+      registrarIntencao(getDb(), currentCpf(), currentConversaId(), { produto_id, quantidade }),
+  ),
+)
+
+mcp.registerTool(
+  'realizar_compra',
+  {
+    description: 'Confirma o pagamento de uma intenção pendente usando cartão ou pix.',
+    inputSchema: {
+      intencao_id: z.string().describe('Identificador retornado por registrar_intencao.'),
+      // enum em vez de string(): o desafio tipa este campo como
+      // "cartao" | "pix", e anunciar `string` deixava o modelo escolher
+      // qualquer coisa pra descobrir o erro só depois da chamada.
+      metodo_pagamento: z.enum(['cartao', 'pix']).describe('Método de pagamento.'),
+    },
+  },
+  auditada(
+    'realizar_compra',
+    ({
+      intencao_id,
+      metodo_pagamento,
+    }: {
+      intencao_id: string
+      metodo_pagamento: 'cartao' | 'pix'
+    }) =>
+      realizarCompra(getDb(), currentCpf(), currentConversaId(), {
+        intencao_id,
+        metodo_pagamento,
+      }),
+  ),
+)
+
 const app = express()
 app.use(express.json())
 
 app.post('/mcp', async (req, res) => {
+  let cpf: string
+  let conversaId: string | undefined
+  try {
+    cpf = resolveCpf(req.headers.authorization, JWT_SECRET)
+    // Ausente é permitido aqui: o catálogo não exige conversa. Quem exige são
+    // as tools de intenção, via currentConversaId(). Malformado, ao contrário,
+    // é recusado já — cabeçalho inválido é erro do cliente, não omissão.
+    conversaId = resolveConversaId(req.headers[CONVERSA_HEADER])
+  } catch (error) {
+    if (error instanceof Unauthorized) return res.status(401).json({ error: 'unauthorized' })
+    throw error
+  }
+
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
   res.on('close', () => transport.close())
   await mcp.connect(transport)
-  await transport.handleRequest(req, res, req.body)
+  await requestIdentity.run({ cpf, conversaId }, () => transport.handleRequest(req, res, req.body))
 })
 
-app.listen(PORT, () => console.log(`ollama-tools (MCP) on http://localhost:${PORT}/mcp`))
+const db = getDb()
+bootstrapSchema(db)
+seedProducts(db)
+
+app.listen(PORT, () => console.log(`agentic-payment (MCP) on http://localhost:${PORT}/mcp`))

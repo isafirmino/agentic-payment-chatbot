@@ -1,30 +1,47 @@
-# ollama-tools
+# mcp-server
 
-Servidor **MCP** com as ferramentas que o modelo do `ollama-chat` pode chamar. Fica num
-processo separado de propósito: o chat nunca executa código de ferramenta, ele só sabe pedir.
+Servico MCP do projeto. Expõe as tools que o agente usa para consultar catalogo, registrar intencoes e confirmar compras.
 
-```bash
-npm install
-npm start     # http://localhost:4000/mcp
-npm run check # self-check + typecheck
+## O que faz
+
+- `listar_catalogo`: mostra produtos disponiveis
+- `registrar_intencao`: cria intencao vinculada ao usuario autenticado e a conversa atual
+- `realizar_compra`: valida o pagamento e grava a transacao quando aprovado
+
+## Regras centrais
+
+- exige `Authorization: Bearer <jwt>`
+- exige `X-Conversa-Id` nas tools de intencao
+- valida o CPF vind do JWT, nunca do argumento da tool
+- recalcula limite e estoque no backend antes de aprovar
+- usa o mesmo SQLite do `api-auth`
+
+## Variaveis relevantes
+
+- `PORT` default `4000`
+- `JWT_SECRET` precisa bater com o do `api-auth`
+- `DATABASE_PATH` default `../data/app.db`
+
+## Endpoint principal
+
+```text
+POST http://localhost:4000/mcp
 ```
 
-Transporte: Streamable HTTP, modo stateless (sem sessão para expirar). Endpoint único:
-`POST /mcp`, falando JSON-RPC.
+## Observacao
 
-| Ferramenta | O que faz |
-| --- | --- |
-| `get_time` | `{ "timezone": "America/Sao_Paulo" }` → data e hora ali. Sem argumento, devolve o horário de Brasília (UTC-3). |
-| `list_items` | `{ "search": "playstation" }` → itens que batem com o filtro e seus preços em BRL. Sem `search`, devolve tudo. |
+As instrucoes completas de execucao do projeto, incluindo a subida dos tres servicos, estao no README raiz.
 
-O chat acha o servidor em `MCP_URL` (padrão `http://localhost:4000/mcp`). Se ele não
-estiver no ar, o chat continua respondendo — só que sem ferramentas.
+Para rodar o servico isolado:
 
-Como é MCP de verdade, qualquer cliente MCP (Claude Desktop, Claude Code, outro agente)
-consegue usar as mesmas ferramentas sem que este projeto saiba quem é o cliente.
+```bash
+cd mcp-server
+npm install
+cp .env.example .env
+npm run dev
+```
 
-O que cada arquivo faz:
-
-- `src/tools.ts` — o que as ferramentas fazem. Não sabe o que é MCP.
-- `src/server.ts` — registra as duas no MCP e sobe o transporte.
-- `src/tools.check.ts` — `node src/tools.check.ts`, roda sozinho e falha se a lógica quebrar.
+Veja tambem:
+- [README raiz](../README.md)
+- [api-auth](../api-auth/README.md)
+- [chat-web](../chat-web/README.md)

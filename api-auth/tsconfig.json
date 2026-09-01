@@ -6,7 +6,10 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "rootDir": "./src"
   },
   "include": ["src"]
 }

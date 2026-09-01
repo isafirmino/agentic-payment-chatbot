@@ -50,7 +50,10 @@ pular). A ordem é:
    `specs/<NNN>-<slug>/{spec.md,plan.md,tasks.md}` (copie
    `specs/TEMPLATE/`) se for feature nova, ou em uma emenda à spec
    existente se o `grill-me` identificou que não é ("## Emenda" em
-   `spec.md`, sem pasta nova). Claude: skill `to-spec`. Copilot: `/to-spec`.
+   `spec.md`, sem pasta nova). Claude chama isso automaticamente assim que
+   o `grilling` termina (fronteira vazia) e o usuário confirma entendimento
+   compartilhado — não precisa esperar o usuário digitar `/to-spec`.
+   Copilot: usuário digita `/to-spec` (sem invocação automática).
 4. Implementar seguindo `tasks.md`, numa branch `feat/<NNN>/<resumo-em-ingles>`
    (`NNN` é o número da task no GitHub Projects do repo, não o número do
    spec — os dois são numerados à parte) criada a partir de `develop`,
@@ -93,7 +96,14 @@ uma decisão daqui a duas semanas.
 - Decisões de arquitetura viram ADR (critério acima) — nunca fique só na
   conversa.
 - Tool ou regra de negócio nova vem com teste do caminho feliz e dos erros
-  esperados.
+  esperados, cobrindo no mínimo 80% das funções do módulo. Teste roda via
+  `node --test` (test runner nativo do Node, sem framework externo — ver
+  convenção em `CONTRIBUTING.md`); o `check` de cada pacote falha se a
+  cobertura de funções ficar abaixo de 80%
+  (`--test-coverage-functions=80`).
+- Antes de considerar qualquer tarefa de código finalizada, rode `npm run
+  check` (ou equivalente) em todo pacote alterado — não só nos arquivos
+  novos — e garanta que passa, testes e cobertura incluídos.
 - Nunca invente decisão de produto (preço, limite, regra de negócio) sem
   perguntar — isso é exatamente o que o `grill-me` existe pra evitar.
 - Validação de intenção e de limite de gasto nunca confia no que o modelo

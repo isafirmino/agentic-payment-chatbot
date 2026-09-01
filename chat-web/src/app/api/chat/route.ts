@@ -1,32 +1,67 @@
+import 'dotenv/config'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPError,
+} from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { pickProvider } from '@/lib/llm'
+import type { Message, ProviderTool, ToolCall } from '@/lib/llm/types'
+import {
+  classifyMcpConnectionFailure,
+  hasBearerAuthorization,
+} from '@/lib/auth/chat-access'
 
-const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434'
-const MODEL = process.env.OLLAMA_MODEL ?? 'qwen2.5:14b'
-const MCP_URL = process.env.MCP_URL ?? 'http://localhost:4000/mcp'
 const HOLD_MS = 600
 const MAX_ROUNDS = 4
 
-type Message = { role: string; content: string; tool_calls?: ToolCall[] }
-type ToolCall = { function: { name: string; arguments: Record<string, unknown> } }
-
-async function connect() {
-  const client = new Client({ name: 'ollama-chat', version: '1.0.0' })
-  await client.connect(new StreamableHTTPClientTransport(new URL(MCP_URL)))
+async function connect(authHeader: string, conversaId: string) {
+  const mcpUrl = process.env.MCP_URL ?? 'http://localhost:4000/mcp'
+  const client = new Client({ name: 'chat-web', version: '1.0.0' })
+  const opts: ConstructorParameters<typeof StreamableHTTPClientTransport>[1] = {
+    // O identificador de conversa vai por cabeçalho, nunca como argumento de
+    // tool: se fosse argumento, o modelo poderia informá-lo, e uma trava que o
+    // próprio modelo preenche não é trava. Ver ADR 0007.
+    requestInit: {
+      headers: { Authorization: authHeader, 'X-Conversa-Id': conversaId },
+    },
+  }
+  await client.connect(new StreamableHTTPClientTransport(new URL(mcpUrl), opts))
   return client
 }
 
-function toOllamaTools(mcpTools: { name: string; description?: string; inputSchema: unknown }[]) {
+function toProviderTools(
+  mcpTools: { name: string; description?: string; inputSchema: unknown }[],
+): ProviderTool[] {
   return mcpTools.map((t) => ({
     type: 'function',
-    function: { name: t.name, description: t.description ?? '', parameters: t.inputSchema },
+    function: {
+      name: t.name,
+      description: t.description ?? '',
+      parameters: t.inputSchema,
+    },
   }))
+}
+
+async function connectWithTools(authHeader: string, conversaId: string) {
+  const client = await connect(authHeader, conversaId)
+  try {
+    const tools = toProviderTools((await client.listTools()).tools)
+    return { client, tools }
+  } catch (error) {
+    await client.close()
+    throw error
+  }
 }
 
 async function runTool(client: Client, call: ToolCall) {
   try {
-    const out = await client.callTool({ name: call.function.name, arguments: call.function.arguments ?? {} })
-    const text = Array.isArray(out.content) ? out.content.find((c) => c.type === 'text')?.text : undefined
+    const out = await client.callTool({
+      name: call.function.name,
+      arguments: call.function.arguments ?? {},
+    })
+    const text = Array.isArray(out.content)
+      ? out.content.find((c) => c.type === 'text')?.text
+      : undefined
     if (out.isError) return { error: text ?? 'tool failed' }
     try {
       return JSON.parse(text ?? 'null')
@@ -39,42 +74,66 @@ async function runTool(client: Client, call: ToolCall) {
 }
 
 export async function POST(request: Request) {
-  const { messages } = await request.json()
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return Response.json({ error: 'messages must be a non-empty array' }, { status: 400 })
+  const authHeader = request.headers.get('authorization')
+  if (!hasBearerAuthorization(authHeader)) {
+    return Response.json({ error: 'unauthorized' }, { status: 401 })
   }
 
-  let client: Client | undefined
-  let tools: unknown[] | undefined
+  let body: unknown
   try {
-    client = await connect()
-    tools = toOllamaTools((await client.listTools()).tools)
+    body = await request.json()
   } catch {
-    client = undefined
+    return Response.json({ error: 'invalid JSON body' }, { status: 400 })
   }
+
+  const messages =
+    typeof body === 'object' && body !== null && 'messages' in body
+      ? body.messages
+      : undefined
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return Response.json(
+      { error: 'messages must be a non-empty array' },
+      { status: 400 },
+    )
+  }
+
+  // Sem identificador de conversa não dá pra registrar nem pagar intenção, e o
+  // servidor MCP recusaria de qualquer jeito. Recusar aqui devolve um erro
+  // claro em vez de deixar o agente esbarrar no 401 no meio de um turno.
+  const conversaId =
+    typeof body === 'object' && body !== null && 'conversaId' in body
+      ? body.conversaId
+      : undefined
+  if (typeof conversaId !== 'string' || !conversaId.trim()) {
+    return Response.json(
+      { error: 'conversaId must be a non-empty string' },
+      { status: 400 },
+    )
+  }
+
+  let connection: Awaited<ReturnType<typeof connectWithTools>>
+  try {
+    connection = await connectWithTools(authHeader, conversaId)
+  } catch (err) {
+    const failure = classifyMcpConnectionFailure(
+      err instanceof StreamableHTTPError ? err.code : undefined,
+    )
+    return Response.json({ error: failure.error }, { status: failure.status })
+  }
+  const { client, tools } = connection
 
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
     async start(controller) {
-      const line = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'))
+      const line = (obj: unknown) =>
+        controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'))
       const convo: Message[] = [...messages]
 
       try {
-        for (let round = 0; round < MAX_ROUNDS; round++) {
-          const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: MODEL, messages: convo, tools, stream: true }),
-            signal: request.signal,
-          })
-          if (!res.ok || !res.body) {
-            line({ error: `ollama: ${res.status} ${await res.text()}`, done: true })
-            break
-          }
+        const streamProvider = await pickProvider()
 
-          const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
-          let buffer = ''
+        for (let round = 0; round < MAX_ROUNDS; round++) {
           let content = ''
           const calls: ToolCall[] = []
           let held = ''
@@ -86,28 +145,23 @@ export async function POST(request: Request) {
             live = true
           }
 
-          for (;;) {
-            const { value, done } = await reader.read()
-            if (done) break
-            buffer += value
-            const parts = buffer.split('\n')
-            buffer = parts.pop() ?? ''
-            for (const part of parts) {
-              if (!part.trim()) continue
-              const chunk = JSON.parse(part)
-              const text = chunk.message?.content ?? ''
-              if (text) {
-                content += text
-                if (live) line(chunk)
-                else {
-                  held += text
-                  if (Date.now() - started > HOLD_MS) flush()
-                }
+          for await (const chunk of streamProvider(
+            convo,
+            tools,
+            request.signal,
+          )) {
+            const text = chunk.message?.content ?? ''
+            if (text) {
+              content += text
+              if (live) line(chunk)
+              else {
+                held += text
+                if (Date.now() - started > HOLD_MS) flush()
               }
-              if (chunk.message?.tool_calls) {
-                calls.push(...chunk.message.tool_calls)
-                held = ''
-              }
+            }
+            if (chunk.message?.tool_calls) {
+              calls.push(...chunk.message.tool_calls)
+              held = ''
             }
           }
 
@@ -119,21 +173,30 @@ export async function POST(request: Request) {
 
           convo.push({ role: 'assistant', content, tool_calls: calls })
           for (const call of calls) {
-            const result = client ? await runTool(client, call) : { error: 'no tool server' }
+            const result = await runTool(client, call)
             convo.push({ role: 'tool', content: JSON.stringify(result) })
-            line({ tool: { name: call.function.name, arguments: call.function.arguments, result } })
+            line({
+              tool: {
+                name: call.function.name,
+                arguments: call.function.arguments,
+                result,
+              },
+            })
           }
         }
       } catch (err) {
         line({ error: String(err), done: true })
       } finally {
-        await client?.close()
+        await client.close()
         controller.close()
       }
     },
   })
 
   return new Response(stream, {
-    headers: { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-store' },
+    headers: {
+      'Content-Type': 'application/x-ndjson',
+      'Cache-Control': 'no-store',
+    },
   })
 }
