@@ -19,12 +19,12 @@
 
 ## README da raiz
 
-- [ ] Criar `README.md` com fluxo, pré-requisitos e execução dos três serviços
-- [ ] Consolidar a tabela de variáveis de ambiente e destacar as compartilhadas
-- [ ] Declarar provedor e modelo usados, referenciando o ADR 0002
-- [ ] Montar a tabela de conformidade com o checklist do `docs/desafio.md`
-- [ ] Documentar a tabela `transacoes` como log auditável e o script de consulta
-- [ ] Embutir as sete evidências com legenda explicando o que cada uma prova
+- [x] Criar `README.md` com fluxo, pré-requisitos e execução dos três serviços
+- [x] Consolidar a tabela de variáveis de ambiente e destacar as compartilhadas
+- [x] Declarar provedor e modelo usados, referenciando o ADR 0002
+- [x] Montar a tabela de conformidade com o checklist do `docs/desafio.md`
+- [x] Documentar a tabela `transacoes` como log auditável e o script de consulta
+- [x] Embutir as sete evidências com legenda explicando o que cada uma prova
 
 ## Execução e captura
 
