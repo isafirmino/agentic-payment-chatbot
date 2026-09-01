@@ -54,7 +54,11 @@ mcp.registerTool(
     description: 'Registra por cinco minutos a intenção de comprar um produto. Não realiza pagamento.',
     inputSchema: {
       produto_id: z.string().describe('Identificador de um produto do catálogo.'),
-      quantidade: z.number().describe('Quantidade desejada; a regra de inteiro positivo é validada no backend.'),
+      // int().positive() em vez de number(): o inputSchema é o contrato que o
+      // modelo recebe na descoberta, então restringir aqui evita a chamada
+      // errada em vez de só recusá-la depois. O backend continua validando —
+      // o schema orienta, não protege.
+      quantidade: z.number().int().positive().describe('Quantidade desejada, inteiro maior que zero.'),
     },
   },
   async ({ produto_id, quantidade }) =>
@@ -67,7 +71,10 @@ mcp.registerTool(
     description: 'Confirma o pagamento de uma intenção pendente usando cartão ou pix.',
     inputSchema: {
       intencao_id: z.string().describe('Identificador retornado por registrar_intencao.'),
-      metodo_pagamento: z.string().describe('Método de pagamento: cartao ou pix.'),
+      // enum em vez de string(): o desafio tipa este campo como
+      // "cartao" | "pix", e anunciar `string` deixava o modelo escolher
+      // qualquer coisa pra descobrir o erro só depois da chamada.
+      metodo_pagamento: z.enum(['cartao', 'pix']).describe('Método de pagamento.'),
     },
   },
   async ({ intencao_id, metodo_pagamento }) =>

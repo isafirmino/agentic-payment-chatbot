@@ -50,25 +50,34 @@ if (!cpf || !senha) {
     await client.connect(
       new StreamableHTTPClientTransport(new URL(MCP_URL), {
         requestInit: {
-        headers: {
-          Authorization: `Bearer ${sessao.token}`,
-          // Qualquer cliente MCP precisa identificar a conversa para usar as
-          // tools de intenção (ADR 0007). Aqui geramos uma, como o chat faz a
-          // cada vez que a página monta.
-          'X-Conversa-Id': crypto.randomUUID(),
+          headers: {
+            Authorization: `Bearer ${sessao.token}`,
+            // Qualquer cliente MCP precisa identificar a conversa para usar as
+            // tools de intenção (ADR 0007). Aqui geramos uma, como o chat faz
+            // a cada vez que a página monta.
+            'X-Conversa-Id': crypto.randomUUID(),
+          },
         },
-      },
       }),
     )
 
     console.log(`\nAutenticado como ${sessao.nome} (CPF ${sessao.cpf}).`)
     console.log('O CPF vem do JWT — nunca dos argumentos da tool.\n')
 
+    // Duas camadas recusam, e a distinção importa:
+    //
+    //   'backend' — a tool rodou e devolveu recusa estruturada, com código.
+    //   'schema'  — o protocolo barrou antes de a tool rodar, porque o
+    //               inputSchema não aceita o valor (ver ADR 0005 e task #20).
+    //
+    // O método de pagamento migrou de 'backend' para 'schema' quando o
+    // inputSchema virou z.enum(['cartao','pix']): METODO_INVALIDO deixou de ser
+    // alcançável por esta via, e a recusa passou a acontecer mais cedo.
     const casos = [
       ['identificador inventado', { intencao_id: 'int_falsa123', metodo_pagamento: 'pix' }, 'INTENCAO_INVALIDA'],
       ['identificador plausível', { intencao_id: 'int_aprovada', metodo_pagamento: 'cartao' }, 'INTENCAO_INVALIDA'],
       ['identificador vazio', { intencao_id: '', metodo_pagamento: 'pix' }, 'INTENCAO_INVALIDA'],
-      ['método fora do contrato', { intencao_id: 'int_falsa123', metodo_pagamento: 'boleto' }, 'INTENCAO_INVALIDA'],
+      ['método fora do contrato', { intencao_id: 'int_falsa123', metodo_pagamento: 'boleto' }, 'schema'],
     ]
     if (intencaoPaga) {
       casos.push(['intenção já paga', { intencao_id: intencaoPaga, metodo_pagamento: 'pix' }, 'INTENCAO_JA_PAGA'])
@@ -79,19 +88,28 @@ if (!cpf || !senha) {
     for (const [rotulo, args, esperado] of casos) {
       const saida = await client.callTool({ name: 'realizar_compra', arguments: args })
       const texto = saida.content?.find((c) => c.type === 'text')?.text ?? ''
+
+      let ok
       let obtido
-      try {
-        obtido = JSON.parse(texto).erro
-      } catch {
-        obtido = undefined
+      if (esperado === 'schema') {
+        // Recusa do protocolo: o callTool resolve normalmente e marca isError,
+        // com "Invalid arguments" no texto — não é JSON de domínio.
+        ok = saida.isError === true && /Invalid arguments/i.test(texto)
+        obtido = ok ? 'schema' : `isError=${saida.isError}`
+      } else {
+        try {
+          obtido = JSON.parse(texto).erro
+        } catch {
+          obtido = undefined
+        }
+        ok = obtido === esperado
       }
-      const ok = obtido === esperado
       if (!ok) divergencias++
 
       console.log(`${ok ? '✔' : '✖'} ${rotulo}`)
       console.log(`    realizar_compra ${JSON.stringify(args)}`)
       console.log(`    -> ${texto}`)
-      if (!ok) console.log(`    ESPERADO erro="${esperado}", veio "${obtido}"`)
+      if (!ok) console.log(`    ESPERADO "${esperado}", veio "${obtido}"`)
       console.log()
     }
 
@@ -99,7 +117,7 @@ if (!cpf || !senha) {
       console.error(`✖ ${divergencias} caso(s) não recusaram como esperado.\n`)
       process.exitCode = 1
     } else {
-      console.log(`✔ Todos os ${casos.length} identificadores inválidos foram recusados pelo backend.\n`)
+      console.log(`✔ Todos os ${casos.length} casos foram recusados — pelo backend ou pelo schema.\n`)
     }
   } catch (erro) {
     console.error(`\n✖ ${erro instanceof Error ? erro.message : erro}\n`)

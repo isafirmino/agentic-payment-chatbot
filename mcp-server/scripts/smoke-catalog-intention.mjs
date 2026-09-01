@@ -110,6 +110,37 @@ async function main() {
     assert(purchase.metodo_pagamento === 'pix', 'unexpected payment method')
     assert(purchase.limite_restante === 500.2, 'unexpected remaining limit')
 
+    // O inputSchema é o contrato anunciado ao modelo, e é a única barreira que
+    // os testes unitários não alcançam: eles chamam as funções direto, sem
+    // passar pelo protocolo. Sem isto, afrouxar um schema não quebraria nada.
+    // A violação de schema volta como resultado de erro da tool, não como
+    // exceção: o callTool resolve normalmente e marca isError.
+    const recusadoPeloSchema = async (name, args, motivo) => {
+      const saida = await client.callTool({ name, arguments: args })
+      const texto = saida.content?.find(({ type }) => type === 'text')?.text ?? ''
+      assert(saida.isError === true, `${motivo}: o schema aceitou ${JSON.stringify(args)}`)
+      assert(
+        /Invalid arguments/i.test(texto),
+        `${motivo}: recusado, mas não pelo schema — ${texto.slice(0, 80)}`,
+      )
+    }
+
+    await recusadoPeloSchema(
+      'registrar_intencao',
+      { produto_id: 'prod_001', quantidade: 1.5 },
+      'quantidade fracionária',
+    )
+    await recusadoPeloSchema(
+      'registrar_intencao',
+      { produto_id: 'prod_001', quantidade: 0 },
+      'quantidade zero',
+    )
+    await recusadoPeloSchema(
+      'realizar_compra',
+      { intencao_id: 'int_qualquer', metodo_pagamento: 'boleto' },
+      'método fora do enum',
+    )
+
     // A exigência do cabeçalho vive no handler HTTP, que os testes de unidade
     // não alcançam — eles chamam as funções direto. Sem isto, remover a
     // exigência não quebraria nenhum teste.
@@ -137,7 +168,9 @@ async function main() {
       await transporteSemConversa.close()
     }
 
-    console.log('✔ Smoke test OK — auth, conversation, discovery, catalog, intention and purchase passed.')
+    console.log(
+      '✔ Smoke test OK — auth, conversation, discovery, catalog, intention, purchase and schemas passed.',
+    )
   } finally {
     await transport?.close()
     cleanupSmokeData(db)
