@@ -1,0 +1,58 @@
+# Tarefas — Documentação de entrega, teste manual e evidências
+
+## Script de auditoria
+
+- [x] Criar `scripts/consultar-transacoes.mjs` reaproveitando `resolveDatabasePath`
+- [x] Agrupar a saída por CPF com limite, saldo restante e lista de compras
+- [x] Tratar banco ausente, tabela ausente e nenhuma compra sem exceção crua
+
+## Configuração
+
+- [x] Comentar alternativas de modelo no `chat-web/.env.example` sem trocar o valor padrão
+
+## Roteiro de teste manual
+
+- [x] Criar `docs/teste-manual.md` com pré-requisitos e ordem de subida dos serviços
+- [x] Descrever a sessão contínua com dados exatos e saldo esperado a cada passo
+- [x] Indicar em cada passo qual captura ele gera e o que precisa estar visível
+- [x] Acrescentar a seção final com os três prompts de jailbreak
+
+## README da raiz
+
+- [x] Criar `README.md` com fluxo, pré-requisitos e execução dos três serviços
+- [x] Consolidar a tabela de variáveis de ambiente e destacar as compartilhadas
+- [x] Declarar provedor e modelo usados, referenciando o ADR 0002
+- [x] Montar a tabela de conformidade com o checklist do `docs/desafio.md`
+- [x] Documentar a tabela `transacoes` como log auditável e o script de consulta
+- [x] Embutir as evidências com legenda explicando o que cada uma prova
+
+## Execução e captura
+
+- [x] Configurar o provedor de LLM e criar os três `.env`
+- [x] Subir os três serviços e confirmar que respondem nas portas 3001, 4000 e 3000
+- [x] Executar o roteiro completo, do cadastro à recusa por `intencao_id` inválido
+- [x] Gravar `01-compra-aprovada-cartao.png` e `02-compra-aprovada-pix.png`
+- [x] Gravar `03-limite-excedido.png` e `04-intencao-invalida.png`
+- [x] Gravar as capturas de jailbreak `05` e `06` — a terceira esbarrou na cota
+      diária do OpenRouter; ver a emenda da spec
+- [x] Registrar a prova de validação direto no MCP, sem o modelo no meio
+- [x] Conferir cada imagem: painel fixado, código de erro legível, sem dado sensível
+
+## Verificação
+
+- [x] Rodar `npm run check` no `chat-web`
+- [x] Rodar `node scripts/verify-shared-db.mjs`
+- [x] Rodar `node scripts/consultar-transacoes.mjs` com o banco da sessão gravada
+- [x] Conferir a tabela de conformidade linha a linha contra o `docs/desafio.md`
+- [x] Confirmar que as imagens renderizam na pré-visualização do README
+- [x] Rodar `pr-review` antes do PR
+
+## Correções da revisão da PR #19
+
+- [x] Tornar a prova de recusa reproduzível em `scripts/verificar-recusas.mjs`
+- [x] Abrir o banco em modo somente leitura no script de auditoria
+- [x] Declarar conformidade parcial nas três linhas em que ela é parcial
+- [x] Abrir issues #20, #21 e #22 para as lacunas de escopo
+- [x] Corrigir a estimativa de requisições por turno do OpenRouter
+- [x] Registrar na emenda que as capturas 05 e 06 são de uma segunda conversa
+- [x] Alinhar contagem de capturas e referências cruzadas entre spec, plano, tasks e README

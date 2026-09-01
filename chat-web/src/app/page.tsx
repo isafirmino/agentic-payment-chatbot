@@ -250,8 +250,25 @@ export default function Page() {
               <span className="font-mono uppercase text-amber-700 dark:text-amber-400">
                 ferramenta · {t.name}
               </span>
-              <p className="whitespace-pre-wrap font-mono text-gray-800 dark:text-gray-200">
-                {JSON.stringify(t.arguments)} → {JSON.stringify(t.result)}
+              {/* JSON identado e com break-all. Sem indentação não existe
+                  espaço em branco onde o whitespace-pre-wrap possa quebrar
+                  linha: o objeto vira uma "palavra" única, transborda a
+                  largura fixa do painel e o corte cai justamente no fim do
+                  retorno — limite_restante numa aprovação, mensagem numa
+                  recusa. Este painel é a prova de que a decisão veio do
+                  backend, então ele precisa caber inteiro na tela. */}
+              <p className="mt-1 whitespace-pre-wrap break-all font-mono">
+                <span className="text-amber-700 dark:text-amber-400">
+                  argumentos
+                </span>
+                {'\n'}
+                {JSON.stringify(t.arguments, null, 2)}
+                {'\n\n'}
+                <span className="text-amber-700 dark:text-amber-400">
+                  retorno
+                </span>
+                {'\n'}
+                {JSON.stringify(t.result, null, 2)}
               </p>
             </div>
           ))}
