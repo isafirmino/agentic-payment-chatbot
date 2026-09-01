@@ -21,6 +21,10 @@
   spec. Comparar e somar somente inteiros em centavos.
 - Calcular o limite restante com `usuarios.limite_cents` menos a soma de
   `transacoes.valor_cents` do CPF. Retornar o saldo depois da compra.
+- Depois das cinco validações contratuais, consultar o estoque atual ainda sob
+  `BEGIN IMMEDIATE`. Se não houver unidades, marcar a intenção como
+  `cancelada_estoque`, confirmar somente essa mudança e retornar
+  `INTENCAO_INVALIDA` com orientação para registrar uma nova intenção.
 - Inserir a transação antes de atualizar estoque e intenção, mantendo os três
   efeitos na mesma transação SQL.
 - Reconhecer especificamente a violação de unicidade de
@@ -50,7 +54,11 @@
 - Forçar uma colisão de `intencao_id` com estado inconsistente controlado para
   testar rollback e tradução da restrição única.
 - Criar um teste concorrente sobre arquivo SQLite temporário e duas conexões
-  independentes, exigindo uma aprovação e uma `INTENCAO_JA_PAGA`.
+  independentes, exigindo uma aprovação e uma `INTENCAO_JA_PAGA`. Aplicar o
+  mesmo `busy_timeout` da aplicação à conexão final de verificação.
+- Cobrir duas intenções sequenciais para todo o estoque de um produto: a
+  primeira aprova, a segunda retorna `INTENCAO_INVALIDA`, não cria transação e
+  permanece cancelada nas tentativas seguintes.
 
 ## 5. Documentação e verificação
 

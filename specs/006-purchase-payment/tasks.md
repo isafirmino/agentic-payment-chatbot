@@ -35,3 +35,13 @@
 - [x] Rodar `node scripts/verify-shared-db.mjs`
 - [x] Executar smoke test da compra com JWT
 - [x] Rodar `pr-review` antes do PR
+
+## Correções da revisão da PR
+
+- [x] Aplicar `busy_timeout` à conexão final do teste concorrente
+- [x] Revalidar estoque e cancelar intenções que não podem mais ser atendidas
+- [x] Retornar recusa estruturada sem ampliar o enum público da task #8
+- [x] Cobrir duas intenções sequenciais disputando as mesmas unidades
+- [x] Aumentar a entropia de `transacao_id` e falhar fechado com expiração corrompida
+- [x] Emendar spec, plano, ADR e README com a decisão corrigida
+- [x] Rodar checks repetidos, smoke test e revisão focal antes de atualizar a PR

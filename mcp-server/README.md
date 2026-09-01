@@ -38,6 +38,11 @@ Recusas retornam `INTENCAO_INVALIDA`, `INTENCAO_JA_PAGA`,
 mensagem legível para o agente. Uma aprovação retorna o valor e o limite
 restante em reais, mas todos os cálculos e valores persistidos usam centavos.
 
+Depois dessas validações, o estoque é conferido novamente dentro da transação.
+Se tiver acabado desde o registro, a intenção é cancelada e retorna
+`INTENCAO_INVALIDA` com orientação para registrar outra, sem cobrança ou erro
+genérico de protocolo.
+
 ## Autenticação
 
 Toda chamada exige:

@@ -126,3 +126,29 @@ reverte todos eles.
 - Log de chamadas recusadas. A tabela registra somente compras aprovadas; sua
   documentação como trilha auditável pertence à task #9.
 - Métodos de pagamento além de cartão e pix ou integração com um provedor real.
+
+## Emenda — 2026-09-01
+
+A revisão da PR demonstrou que a decisão de não revalidar estoque estava
+baseada numa premissa incorreta: mesmo com um único usuário e sem concorrência,
+duas intenções podem ser registradas para as mesmas unidades antes de a
+primeira compra reduzir o estoque. A segunda compra então alcançava o
+`CHECK (estoque >= 0)`, sofria rollback e devolvia uma exceção genérica ao
+agente.
+
+Esta emenda substitui a decisão anterior sobre estoque e o item correspondente
+de "Fora de escopo": depois das cinco validações contratuais, o backend também
+confere o estoque atual dentro do mesmo `BEGIN IMMEDIATE`. Se o produto não
+existir mais ou a quantidade não estiver disponível, nenhuma transação é
+criada, a intenção recebe o estado interno `cancelada_estoque` e a tool retorna
+`INTENCAO_INVALIDA` com mensagem para registrar uma nova intenção.
+
+O código público permanece dentro do enum fechado da task #8. Repetir a mesma
+intenção cancelada retorna a mesma recusa de estoque, em vez de uma exceção ou
+de `INTENCAO_JA_PAGA`. Testes cobrem tanto a falta de estoque forçada quanto o
+fluxo sequencial com duas intenções legítimas para as mesmas unidades.
+
+O teste concorrente também passa a configurar `busy_timeout = 5000` na conexão
+final de verificação. Sem essa espera, o processo pai podia abrir a conexão
+enquanto um worker ainda fechava o WAL, causando `database is locked` de forma
+intermitente.

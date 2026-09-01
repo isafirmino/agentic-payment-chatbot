@@ -30,6 +30,12 @@ transações daquele CPF, sem reset. `transacoes.intencao_id` é obrigatório e
 único; uma violação dessa unicidade é traduzida para `INTENCAO_JA_PAGA` depois
 do rollback.
 
+Depois das validações contratuais, o estoque é consultado novamente dentro da
+mesma transação. Se tiver acabado desde o registro, a intenção é marcada como
+`cancelada_estoque` e retorna `INTENCAO_INVALIDA` com uma mensagem específica,
+preservando o enum público da task e impedindo novas tentativas sobre uma
+intenção que não pode mais ser atendida.
+
 ## Alternativas consideradas
 
 - **Validar antes de abrir a transação e confiar somente no status da
@@ -44,6 +50,11 @@ do rollback.
 - **Consultar o limite pela API de autenticação** — acrescentaria uma chamada
   de rede e não tornaria o cálculo e a gravação atômicos. O banco compartilhado
   já foi escolhido no ADR 0003 justamente para essa integração.
+- **Acrescentar `ESTOQUE_INSUFICIENTE` ao contrato de `realizar_compra`** —
+  comunicaria a causa com um código mais específico, mas ampliaria o enum
+  fechado da task #8. `INTENCAO_INVALIDA` com mensagem explícita e um estado
+  interno de cancelamento preserva o contrato e permite ao agente orientar o
+  registro de uma nova intenção.
 
 ## Consequências
 
@@ -59,5 +70,6 @@ do rollback.
   deverá ser avaliado.
 - O limite nunca volta automaticamente. Reset periódico, estorno e reembolso
   exigirão uma nova decisão de negócio e não podem ser inferidos desta política.
-- Estoque continua sem reserva ou revalidação no pagamento, conforme o escopo
-  da task. Qualquer falha de integridade nessa atualização aborta toda a compra.
+- Estoque continua sem reserva no registro da intenção, mas é revalidado no
+  pagamento. Isso fecha o caso sequencial em que duas intenções consomem as
+  mesmas unidades sem transformar uma recusa esperada em erro de protocolo.
