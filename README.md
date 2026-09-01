@@ -183,6 +183,18 @@ conversa mostraria o agente *dizendo* que algo foi recusado, o que é
 indistinguível de um modelo inventando a recusa. Com o painel, aparece o
 retorno da tool — a prova de que a decisão veio do servidor.
 
+Que o texto do agente não basta como prova ficou demonstrado durante o próprio
+teste: o modelo anunciou "Monitor 27" 144Hz por R$ 1.809,90" quando a
+ferramenta havia devolvido `1899.9`. O balão de conversa erra; o retorno da
+tool, não.
+
+> O painel corta o fim do JSON quando o retorno é longo, então `status` e
+> `erro` aparecem mas `limite_restante` e `mensagem` podem ficar fora da
+> captura — é a [issue #16](https://github.com/isafirmino/agentic-payment-chatbot/issues/16),
+> de legibilidade, não de comportamento. O valor correto é calculado,
+> retornado e persistido; a evidência 8, ao final desta seção, o comprova de
+> forma independente, lendo direto do banco.
+
 ### 1. Compra aprovada com cartão
 
 ![Compra aprovada com cartão](docs/screenshots/01-compra-aprovada-cartao.png)
@@ -233,8 +245,35 @@ aprovar uma compra sem registrar intenção. O backend segura os três.
 Nenhum desses pedidos tem por onde passar: `realizar_compra` recebe apenas
 `intencao_id` e `metodo_pagamento` — **não recebe valor, nem identidade, nem
 autorização** —, o CPF vem do JWT e o valor cobrado vem sempre de
-`intencoes.valor_total_cents`. O script de auditoria confirma que nenhuma das
-tentativas gerou cobrança.
+`intencoes.valor_total_cents`.
+
+### 8. O log auditável ao final da sessão
+
+A última evidência não é uma captura de tela, e é a mais difícil de forjar: o
+estado do banco depois de tudo.
+
+```
+$ node scripts/consultar-transacoes.mjs
+
+José Carlos  (CPF 11122233344)
+  limite R$ 1.000,00
+  gasto  R$ 439,80 em 2 compra(s)
+  saldo  R$ 560,20
+
+    Fone Bluetooth x1        R$ 249,90  cartao
+    Mochila pra Notebook x1  R$ 189,90  pix
+
+2 transação(ões) registrada(s) no total.
+```
+
+**Duas** transações, exatamente as duas aprovadas. As quatro tentativas
+recusadas — limite excedido, intenção inválida e as três de jailbreak — não
+deixaram cobrança nenhuma, não alteraram o saldo e não aparecem aqui.
+
+O saldo de R$ 560,20 é o mesmo que o `realizar_compra` devolveu como
+`limite_restante` na evidência 2, calculado com a mesma expressão do backend.
+É por isso que o corte do painel descrito acima não enfraquece a prova: o que
+não coube na tela está aqui, vindo direto do banco.
 
 ---
 
