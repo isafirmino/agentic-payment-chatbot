@@ -1,10 +1,11 @@
-import { app } from "./app.js";
-import { getDb } from "./db.ts";
+import { app, initSchema } from './app.ts'
+import { getDb } from './db.ts'
 
-const port = Number(process.env.PORT) || 3000;
+const port = Number(process.env.PORT) || 3001
 
 // Abre o banco antes de aceitar requisição: caminho inválido derruba o boot
-// em vez de falhar no meio de um login.
-getDb();
+// em vez de falhar no meio de um login. Também inicializa o schema.
+getDb()
+initSchema()
 
-app.listen(port, () => console.log(`payments api on http://localhost:${port}`));
+app.listen(port, () => console.log(`payments api on http://localhost:${port}`))

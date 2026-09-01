@@ -1,0 +1,160 @@
+# Tasks — Autenticação (Task #5)
+
+Marque cada item conforme completa. Não avance para o próximo bloco sem finalizar todos da seção.
+
+## Backend (`api-auth/`)
+
+### Preparação
+
+- [x] Conferir que `db.ts` (Task 0) está disponível em `api-auth/src/` com função `getDb()` exportada
+- [x] Atualizar `.env.example`: adicionar comentário explícito que `JWT_SECRET` é compartilhado com `mcp-server`
+
+### Schema
+
+- [x] Adicionar tabela `usuarios(cpf TEXT PRIMARY KEY, nome TEXT NOT NULL, password_hash TEXT NOT NULL, limite_cents INTEGER NOT NULL DEFAULT 100000)` no bootstrap de `app.ts` usando `getDb()` e `CREATE TABLE IF NOT EXISTS`
+- [x] Definir `DEFAULT_LIMITE_CENTS = 100000` como env var (padrão R$ 1.000,00)
+
+### `POST /auth/cadastro` (nome, cpf, senha)
+
+- [x] Validar entrada: `typeof nome === 'string' && cpf && senha && (não vazio)`
+- [x] Hash senha com `hashPassword(senha)` (função já existe)
+- [x] Inserir em DB: `INSERT INTO usuarios(cpf, nome, password_hash, limite_cents) VALUES (...)`
+- [x] Sucesso: retornar `{ message: "cadastro realizado" }`
+- [x] Erro (CPF duplicado): retornar `{ error: "CPF já cadastrado" }` status 400
+- [x] Erro (outro): retornar `{ error: "..." }` status 500
+
+### `POST /auth/login` (cpf, senha)
+
+- [x] Validar entrada: `typeof cpf === 'string' && typeof senha === 'string'`
+- [x] Buscar usuário em DB: `SELECT * FROM usuarios WHERE cpf = ?`
+- [x] Validar senha com `verifyPassword(senha, stored_hash)`
+- [x] Sucesso: emitir JWT: `jwt.sign({}, JWT_SECRET, { subject: cpf, expiresIn: '1h' })`
+- [x] Sucesso: retornar `{ token, cpf, nome, expiresIn: '1h' }`
+- [x] Erro (not found ou senha errada): retornar `{ error: "CPF ou senha inválidos" }` status 401
+
+### `GET /usuarios/me/limite` (requer JWT válido)
+
+- [x] Middleware: validar JWT no header `Authorization: Bearer <token>`
+- [x] Extrair `sub` (CPF) do JWT
+- [x] Buscar usuário: `SELECT limite_cents FROM usuarios WHERE cpf = ?`
+- [x] Sucesso: retornar `{ limite_cents }`
+- [x] Erro (token inválido/expirado): retornar `{ error: "..." }` status 401
+- [x] Erro (usuário não encontrado): retornar `{ error: "..." }` status 404
+
+### Limpeza de endpoints (herdados do workshop)
+
+- [x] Remover `POST /auth/admin/login`
+- [x] Remover `POST /payments`
+- [x] Remover `GET /payments/:id`
+- [x] Remover `GET /payments`
+- [x] Remover tipos `Role` e lógica de `role` no JWT
+
+### Testes (`api-auth/src/app.test.ts`)
+
+- [x] Teste: cadastro com CPF novo → sucesso `{ message: "..." }`
+- [x] Teste: cadastro com CPF duplicado → erro `{ error: "CPF já cadastrado" }`
+- [x] Teste: login com credenciais corretas → sucesso `{ token, cpf, nome, expiresIn }`
+- [x] Teste: login com CPF errado → erro `{ error: "..." }`
+- [x] Teste: login com senha errada → erro `{ error: "..." }`
+- [x] Teste: JWT contém `sub: cpf` (sem `role`, sem `limite_cents`)
+- [x] Teste: `GET /usuarios/me/limite` com JWT válido → `{ limite_cents: 100000 }`
+- [x] Teste: `GET /usuarios/me/limite` sem JWT → erro 401
+- [x] Teste: `GET /usuarios/me/limite` com JWT inválido → erro 401
+- [x] Cobertura: `npm run check` deve passar com ≥80% de cobertura de funções
+
+### Hardening pós-review
+
+- [x] Aceitar `DEFAULT_LIMITE_CENTS=0` e recusar configuração negativa, fracionária ou inválida
+- [x] Exigir `JWT_SECRET` explícito quando `NODE_ENV=production`
+- [x] Recusar JWT sem `sub` com 401
+- [x] Executar scrypt também quando o CPF não existe
+- [x] Remover `any` do tratamento de erro de constraint
+- [x] Cobrir configuração, token expirado, token sem `sub` e CORS com testes
+- [x] Rodar testes direto do TypeScript, sem gerar `dist/`
+
+### Documentação
+
+- [x] Criar ADR em `docs/adr/0004-authentication-jwt-cpf.md` registrando:
+  - Decisão de usar JWT com `sub=cpf` (sem `role`, sem limite no payload)
+  - `DEFAULT_LIMITE_CENTS = 100000` pra todos
+  - Compartilhamento de `JWT_SECRET` entre `api-auth` e `mcp-server`
+
+---
+
+## Frontend (`chat-web/`)
+
+### Preparação
+
+- [x] Adicionar env var `NEXT_PUBLIC_AUTH_URL` em `.env.example` (ex.: `http://localhost:3001`)
+- [x] Confirmar que `NEXT_PUBLIC_AUTH_URL` está definida no `.env` local
+
+### Página de cadastro (`src/app/cadastro/page.tsx`)
+
+- [x] Criar novo arquivo `'use client'` com form: inputs `nome`, `cpf`, `senha`
+- [x] Input type: `type="password"` pra senha
+- [x] No submit: `POST ${NEXT_PUBLIC_AUTH_URL}/auth/cadastro` com `{ nome, cpf, senha }`
+- [x] Sucesso: redirecionar pra `/login` usando `useRouter().push('/login')`
+- [x] Erro: exibir mensagem do backend abaixo do form
+- [x] Link pra login: "Já tem conta? Faça login"
+
+### Página de login (`src/app/login/page.tsx`)
+
+- [x] Criar novo arquivo `'use client'` com form: inputs `cpf`, `senha`
+- [x] Input type: `type="password"` pra senha
+- [x] No submit: `POST ${NEXT_PUBLIC_AUTH_URL}/auth/login` com `{ cpf, senha }`
+- [x] Sucesso: grava em `localStorage['chat_session']` objeto `{ token, cpf, nome }`
+- [x] Sucesso: redirecionar pra `/` usando `useRouter().push('/')`
+- [x] Erro: exibir mensagem do backend abaixo do form
+- [x] Link pra cadastro: "Não tem conta? Cadastre-se"
+
+### Gate client-side (`src/app/page.tsx`)
+
+- [x] Adicionar `useEffect` que roda no mount:
+  - Lê `localStorage['chat_session']`
+  - Se vazio/null: redireciona pra `/login` antes de renderizar chat
+  - Se existe: renderiza chat normalmente
+- [x] Guardar sessão em estado pra usar em `route.ts` (header Authorization)
+
+### Envio de token (`src/app/api/chat/route.ts`)
+
+- [x] Ler `Authorization` header: `request.headers.get('authorization')`
+- [x] Repassar pro MCP: `new StreamableHTTPClientTransport({ url, requestInit: { headers: { Authorization: authHeader } } })`
+- [x] Se sem Bearer token: retornar 401 antes de chamar o MCP
+- [x] Se o MCP recusar o token: propagar 401/403
+- [x] Se o MCP estiver indisponível: retornar 503 sem chamar o LLM
+- [x] Cobrir a decisão fail-closed com teste automatizado em `src/lib/auth/chat-access.check.ts`
+
+### Testes manuais
+
+- [x] Fluxo novo: cadastro → login → chat (token viaja no header)
+- [x] Token expirado: editar localStorage pra token fake, enviar mensagem, verificar erro
+- [x] Redirecionamento: entrar em `http://localhost:3000/` sem session → redireciona pra `/login`
+- [x] Erro de CPF duplicado: tentar cadastrar 2x mesma pessoa → mensagem aparece
+- [x] Erro de credenciais: login com senha errada → mensagem aparece
+
+### Regressões pós-review
+
+- [x] Sessão ausente, incompleta ou inválida é recusada pelo gate
+- [x] Resposta 401/403 limpa a sessão e redireciona para `/login` com mensagem
+- [x] MCP indisponível retorna 503 sem chamar o LLM
+- [x] Campos de senha permitem mostrar e ocultar o valor
+
+---
+
+## Integração + Validação
+
+- [x] Conferir que ambos `api-auth` e `mcp-server` têm **idêntico** `JWT_SECRET` em `.env`
+- [x] Rodar `npm run check` em `api-auth/` (testes + cobertura 80%)
+- [x] Rodar `npm run check` em `chat-web/` (lint + typecheck)
+- [x] Rodar `npm run check` em `mcp-server/` após integrar com `develop`
+- [x] Testar ponta-a-ponta: usuário novo → cadastro → login → chat → enviar mensagem
+- [x] Coordenar com Task B: a task #8 (`realizar_compra`) **não** chama `GET /usuarios/me/limite` — lê `usuarios.limite_cents` direto da tabela compartilhada, reaproveitando a conexão de `db.ts` da task #7. Ver Emenda em `spec.md` e ADR 0004.
+
+---
+
+## Pronto pra PR?
+
+- [x] Todos os itens acima estão marcados
+- [x] Branch está atualizada com `develop` (sem conflitos)
+- [x] `npm run check` passa nos três pacotes
+- [x] Fluxo manual foi testado

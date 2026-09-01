@@ -28,3 +28,7 @@ test('respeita caminho absoluto sem prefixar a raiz do pacote', () => {
 test('ignora espaços em volta do caminho informado', () => {
   assert.equal(resolveDatabasePath('  ../data/app.db  ', ROOT), resolve(ROOT, '../data/app.db'))
 })
+
+test('retorna :memory: sem resolver contra raiz do pacote', () => {
+  assert.equal(resolveDatabasePath(':memory:', ROOT), ':memory:')
+})

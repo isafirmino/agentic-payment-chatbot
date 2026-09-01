@@ -1,16 +1,38 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Markdown from 'react-markdown'
 import { buildPayload, toHistory, type Turn } from '@/lib/chat/payload'
+import { AUTH_MESSAGE_KEY, parseChatSession } from '@/lib/auth/session'
 
 export default function Page() {
+  const router = useRouter()
+  const [autenticado, setAutenticado] = useState(false)
   const [messages, setMessages] = useState<Turn[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [peek, setPeek] = useState<number | null>(null)
   const [pinned, setPinned] = useState(false)
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  )
+
+  // Gate: checa autenticação no mount
+  useEffect(() => {
+    const session = parseChatSession(localStorage.getItem('chat_session'))
+    if (!session) {
+      localStorage.removeItem('chat_session')
+      router.replace('/login')
+    } else {
+      setAutenticado(true)
+    }
+  }, [router])
+
+  // Se não autenticado, não renderiza o chat
+  if (!autenticado) {
+    return <div>Redirecionando...</div>
+  }
 
   function showPeek(i: number) {
     clearTimeout(closeTimer.current)
@@ -29,6 +51,12 @@ export default function Page() {
     setPeek(desfixar ? null : i)
   }
 
+  function redirectToLogin(message: string) {
+    localStorage.removeItem('chat_session')
+    sessionStorage.setItem(AUTH_MESSAGE_KEY, message)
+    router.replace('/login')
+  }
+
   async function send(e: { preventDefault(): void }) {
     e.preventDefault()
     if (!input.trim() || busy) return
@@ -42,11 +70,24 @@ export default function Page() {
     setBusy(true)
 
     try {
+      const session = parseChatSession(localStorage.getItem('chat_session'))
+      if (!session) {
+        redirectToLogin('Faça login para continuar.')
+        return
+      }
+
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.token}`,
+        },
         body: JSON.stringify({ messages: payload }),
       })
+      if (res.status === 401 || res.status === 403) {
+        redirectToLogin('Sua sessão expirou. Faça login novamente.')
+        return
+      }
       if (!res.ok || !res.body) throw new Error(await res.text())
 
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
@@ -83,8 +124,8 @@ export default function Page() {
       <div className="flex-1 space-y-3 overflow-y-auto">
         {messages.length === 0 && (
           <p className="text-sm text-gray-500">
-            Toda a conversa vai junto ao modelo em cada mensagem. Clique numa mensagem sua
-            para fixar o painel com o que foi enviado.
+            Toda a conversa vai junto ao modelo em cada mensagem. Clique numa
+            mensagem sua para fixar o painel com o que foi enviado.
           </p>
         )}
         {messages.map((m, i) =>
@@ -106,7 +147,7 @@ export default function Page() {
             >
               {m.content ? <Markdown>{m.content}</Markdown> : '…'}
             </div>
-          )
+          ),
         )}
       </div>
 
@@ -117,7 +158,10 @@ export default function Page() {
           onChange={(e) => setInput(e.target.value)}
           placeholder="Pergunte alguma coisa…"
         />
-        <button className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50" disabled={busy}>
+        <button
+          className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+          disabled={busy}
+        >
           Enviar
         </button>
       </form>
@@ -144,8 +188,13 @@ export default function Page() {
             )}
           </div>
           {messages[peek].tools?.map((t, j) => (
-            <div key={`tool-${j}`} className="mb-2 rounded border border-amber-400 bg-amber-50 p-2 dark:bg-amber-950">
-              <span className="font-mono uppercase text-amber-700 dark:text-amber-400">ferramenta · {t.name}</span>
+            <div
+              key={`tool-${j}`}
+              className="mb-2 rounded border border-amber-400 bg-amber-50 p-2 dark:bg-amber-950"
+            >
+              <span className="font-mono uppercase text-amber-700 dark:text-amber-400">
+                ferramenta · {t.name}
+              </span>
               <p className="whitespace-pre-wrap font-mono">
                 {JSON.stringify(t.arguments)} → {JSON.stringify(t.result)}
               </p>
@@ -153,7 +202,9 @@ export default function Page() {
           ))}
           {messages[peek].sent.map((s, j) => (
             <div key={j} className="mb-2 last:mb-0">
-              <span className="font-mono uppercase text-gray-500">{s.role}</span>
+              <span className="font-mono uppercase text-gray-500">
+                {s.role}
+              </span>
               <p className="whitespace-pre-wrap">{s.content}</p>
             </div>
           ))}
