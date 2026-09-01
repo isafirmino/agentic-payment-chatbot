@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import Markdown from 'react-markdown'
 import { buildPayload, toHistory, type Turn } from '@/lib/chat/payload'
 import { AUTH_MESSAGE_KEY, parseChatSession } from '@/lib/auth/session'
+import TypingDots from '@/components/chat/TypingDots'
 
 export default function Page() {
   const router = useRouter()
   const [autenticado, setAutenticado] = useState(false)
+  const [nome, setNome] = useState('')
   const [messages, setMessages] = useState<Turn[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -17,6 +19,7 @@ export default function Page() {
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   )
+  const scrollRef = useRef<HTMLDivElement>(null)
   // Identidade desta conversa, gerada uma vez e mantida só em memória: um
   // reload começa outra conversa, e a intenção registrada na anterior deixa de
   // ser pagável. É o que torna a regra verdadeira — sem histórico não há
@@ -31,8 +34,22 @@ export default function Page() {
       router.replace('/login')
     } else {
       setAutenticado(true)
+      setNome(session.nome)
     }
   }, [router])
+
+  // Auto-scroll para o fim quando novas mensagens chegam
+  useEffect(() => {
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: 'smooth',
+    })
+  }, [messages])
+
+  function logout() {
+    localStorage.removeItem('chat_session')
+    router.replace('/login')
+  }
 
   // Se não autenticado, não renderiza o chat
   if (!autenticado) {
@@ -125,10 +142,35 @@ export default function Page() {
   }
 
   return (
-    <main className="mx-auto flex h-screen max-w-2xl flex-col gap-4 p-4">
-      <div className="flex-1 space-y-3 overflow-y-auto">
+    <main className="mx-auto flex h-screen max-w-2xl flex-col">
+      {/* Cabeçalho */}
+      <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-uol-blue text-sm font-black text-white">
+            U
+          </span>
+          <div>
+            <h1 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              Compass
+            </h1>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{nome}</p>
+          </div>
+        </div>
+        <button
+          onClick={logout}
+          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+        >
+          Sair
+        </button>
+      </header>
+
+      {/* Mensagens */}
+      <div
+        ref={scrollRef}
+        className="flex-1 space-y-3 overflow-y-auto bg-gray-50 p-4 dark:bg-gray-950"
+      >
         {messages.length === 0 && (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Toda a conversa vai junto ao modelo em cada mensagem. Clique numa
             mensagem sua para fixar o painel com o que foi enviado.
           </p>
@@ -141,34 +183,47 @@ export default function Page() {
               onMouseLeave={hidePeek}
               onClick={() => togglePin(i)}
               title="Ver o que foi enviado ao modelo (clique para fixar)"
-              className="ml-auto w-fit max-w-[80%] cursor-pointer whitespace-pre-wrap rounded bg-blue-600 px-3 py-2 text-white"
+              className="ml-auto w-fit max-w-[80%] cursor-pointer whitespace-pre-wrap rounded-2xl rounded-br-sm bg-uol-blue px-4 py-2.5 text-white shadow-sm"
             >
               {m.content}
             </div>
           ) : (
             <div
               key={i}
-              className="prose-chat w-fit max-w-[80%] rounded bg-gray-200 px-3 py-2 dark:bg-gray-800"
+              className="prose-chat w-fit max-w-[80%] rounded-2xl rounded-bl-sm border border-gray-200 bg-white px-4 py-2.5 text-gray-900 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
             >
-              {m.content ? <Markdown>{m.content}</Markdown> : '…'}
+              {m.content ? (
+                <Markdown>{m.content}</Markdown>
+              ) : busy && i === messages.length - 1 ? (
+                <TypingDots />
+              ) : (
+                '…'
+              )}
             </div>
           ),
         )}
       </div>
 
-      <form onSubmit={send} className="flex gap-2">
-        <input
-          className="flex-1 rounded border px-3 py-2"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Pergunte alguma coisa…"
-        />
-        <button
-          className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
-          disabled={busy}
-        >
-          Enviar
-        </button>
+      {/* Entrada de texto */}
+      <form
+        onSubmit={send}
+        className="border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"
+      >
+        <div className="flex gap-2">
+          <input
+            className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 shadow-sm outline-none transition focus:border-uol-blue focus:ring-2 focus:ring-uol-blue/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Pergunte alguma coisa…"
+            disabled={busy}
+          />
+          <button
+            className="rounded-xl bg-uol-blue px-5 py-3 font-semibold text-white transition hover:bg-uol-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={busy || !input.trim()}
+          >
+            Enviar
+          </button>
+        </div>
       </form>
 
       {peek !== null && messages[peek]?.sent && (
@@ -178,14 +233,14 @@ export default function Page() {
           className="fixed right-4 top-4 z-10 max-h-[calc(100vh-2rem)] w-80 overflow-y-auto rounded border border-gray-300 bg-white p-3 text-xs shadow-lg xl:w-96 dark:border-gray-700 dark:bg-gray-900"
         >
           <div className="mb-2 flex items-start justify-between gap-2">
-            <p className="font-semibold">
+            <p className="font-semibold text-gray-900 dark:text-gray-100">
               Enviado ao modelo ({messages[peek].sent.length}{' '}
               {messages[peek].sent.length === 1 ? 'mensagem' : 'mensagens'})
             </p>
             {pinned && (
               <button
                 onClick={() => togglePin(peek)}
-                className="rounded border px-2 py-0.5 text-xs"
+                className="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-700 dark:border-gray-600 dark:text-gray-200"
                 aria-label="Desafixar painel"
               >
                 fixado ×
@@ -224,10 +279,12 @@ export default function Page() {
           ))}
           {messages[peek].sent.map((s, j) => (
             <div key={j} className="mb-2 last:mb-0">
-              <span className="font-mono uppercase text-gray-500">
+              <span className="font-mono uppercase text-gray-500 dark:text-gray-400">
                 {s.role}
               </span>
-              <p className="whitespace-pre-wrap">{s.content}</p>
+              <p className="whitespace-pre-wrap text-gray-800 dark:text-gray-200">
+                {s.content}
+              </p>
             </div>
           ))}
         </aside>

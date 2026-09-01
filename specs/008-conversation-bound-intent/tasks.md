@@ -36,9 +36,9 @@
 ## Scripts
 
 - [x] `smoke-catalog-intention.mjs` gera e envia o identificador
-- [ ] `verificar-recusas.mjs` gera e envia o identificador — **o arquivo ainda
-      não existe na `develop`**, vem na PR #19 (task #9). Quem mergear por
-      último acrescenta o cabeçalho; sem ele o script passa a falhar
+- [x] `verificar-recusas.mjs` gera e envia o identificador — o arquivo chegou
+      na `develop` com o merge da PR #19, e o cabeçalho foi acrescentado ao
+      resolver o conflito
 - [x] Smoke test cobre: intenção sem cabeçalho recusada, catálogo sem cabeçalho aprovado
 
 ## Documentação

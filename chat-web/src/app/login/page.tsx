@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AUTH_MESSAGE_KEY, type ChatSession } from '@/lib/auth/session'
+import AuthCard from '@/components/auth/AuthCard'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -59,11 +60,29 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px' }}>
-      <h1>Login</h1>
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="cpf">CPF:</label>
+    <AuthCard
+      title="Bem-vindo de volta"
+      subtitle="Entre para continuar suas compras"
+      footer={
+        <>
+          Não tem conta?{' '}
+          <Link
+            href="/cadastro"
+            className="font-semibold text-white underline underline-offset-2 hover:text-uol-yellow transition-colors"
+          >
+            Cadastre-se
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div>
+          <label
+            htmlFor="cpf"
+            className="block text-sm font-medium text-gray-700 mb-1.5 dark:text-gray-300"
+          >
+            CPF
+          </label>
           <input
             id="cpf"
             type="text"
@@ -71,13 +90,19 @@ export default function LoginPage() {
             onChange={(e) => setCpf(e.target.value)}
             required
             disabled={carregando}
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+            placeholder="000.000.000-00"
+            className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-uol-blue focus:ring-2 focus:ring-uol-blue/30 outline-none transition disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
           />
         </div>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="senha">Senha:</label>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '5px' }}>
+        <div>
+          <label
+            htmlFor="senha"
+            className="block text-sm font-medium text-gray-700 mb-1.5 dark:text-gray-300"
+          >
+            Senha
+          </label>
+          <div className="relative">
             <input
               id="senha"
               type={mostrarSenha ? 'text' : 'password'}
@@ -85,13 +110,15 @@ export default function LoginPage() {
               onChange={(e) => setSenha(e.target.value)}
               required
               disabled={carregando}
-              style={{ flex: 1, padding: '8px' }}
+              placeholder="••••••••"
+              className="w-full px-4 py-3 pr-24 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-uol-blue focus:ring-2 focus:ring-uol-blue/30 outline-none transition disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
             />
             <button
               type="button"
               onClick={() => setMostrarSenha((value) => !value)}
               disabled={carregando}
               aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+              className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 text-sm font-medium text-uol-blue hover:bg-uol-blue/10 rounded-md transition"
             >
               {mostrarSenha ? 'Ocultar' : 'Mostrar'}
             </button>
@@ -99,35 +126,20 @@ export default function LoginPage() {
         </div>
 
         {erro && (
-          <div style={{ color: 'red', marginBottom: '15px' }}>{erro}</div>
+          <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+            <span aria-hidden="true">⚠</span>
+            <span>{erro}</span>
+          </div>
         )}
 
         <button
           type="submit"
           disabled={carregando}
-          style={{
-            width: '100%',
-            padding: '10px',
-            backgroundColor: carregando ? '#ccc' : '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: carregando ? 'not-allowed' : 'pointer',
-          }}
+          className="w-full py-3 rounded-lg font-semibold text-white bg-uol-blue hover:bg-uol-blue-dark focus:ring-4 focus:ring-uol-blue/30 transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {carregando ? 'Entrando...' : 'Entrar'}
         </button>
       </form>
-
-      <p style={{ marginTop: '20px', textAlign: 'center' }}>
-        Não tem conta?{' '}
-        <Link
-          href="/cadastro"
-          style={{ color: '#007bff', textDecoration: 'none' }}
-        >
-          Cadastre-se
-        </Link>
-      </p>
-    </div>
+    </AuthCard>
   )
 }
